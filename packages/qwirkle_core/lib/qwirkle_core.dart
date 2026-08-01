@@ -3,6 +3,7 @@
 library;
 
 export 'src/board.dart';
+export 'src/bot.dart';
 export 'src/game.dart';
 export 'src/invalid_move_exception.dart';
 export 'src/move.dart';

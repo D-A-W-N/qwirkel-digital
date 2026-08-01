@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 
+import 'game_controller.dart';
 import 'game_providers.dart';
 import 'widgets/board_view.dart';
 import 'widgets/hand_view.dart';
@@ -17,6 +20,13 @@ class GameScreen extends ConsumerStatefulWidget {
 class _GameScreenState extends ConsumerState<GameScreen> {
   bool _exchangeMode = false;
   bool _gameOverShown = false;
+  Timer? _botTimer;
+
+  @override
+  void dispose() {
+    _botTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,10 +38,26 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _showGameOverDialog(context, game),
       );
+    } else if (!game.isOver && controller.isCurrentPlayerBot) {
+      _scheduleBotTurn(controller);
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text('Qwirkle · Beutel: ${game.bag.remaining}')),
+      appBar: AppBar(
+        title: Text('Qwirkle · Beutel: ${game.bag.remaining}'),
+        bottom: controller.isCurrentPlayerBot && !game.isOver
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(28),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '${game.currentPlayer.name} (Bot) denkt nach …',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              )
+            : null,
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -49,9 +75,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   style: TextStyle(color: Colors.red.shade900),
                 ),
               ),
-            const Expanded(child: BoardView()),
+            Expanded(
+              child: IgnorePointer(
+                ignoring: controller.isCurrentPlayerBot,
+                child: const BoardView(),
+              ),
+            ),
             _ControlPanel(
               exchangeMode: _exchangeMode,
+              enabled: !controller.isCurrentPlayerBot,
               onToggleMode: () {
                 setState(() => _exchangeMode = !_exchangeMode);
                 controller.resetPendingPlacements();
@@ -62,6 +94,17 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ),
       ),
     );
+  }
+
+  /// Löst den Zug einer KI-Spielerin verzögert aus (damit der Zugwechsel
+  /// sichtbar bleibt) und vermeidet Mehrfachauslösung pro Build.
+  void _scheduleBotTurn(GameController controller) {
+    if (_botTimer != null) return;
+    _botTimer = Timer(const Duration(milliseconds: 500), () {
+      _botTimer = null;
+      if (!mounted) return;
+      controller.playBotTurn();
+    });
   }
 
   void _showGameOverDialog(BuildContext context, QwirkleGame game) {
@@ -97,15 +140,22 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
 class _ControlPanel extends ConsumerWidget {
   final bool exchangeMode;
+  final bool enabled;
   final VoidCallback onToggleMode;
 
-  const _ControlPanel({required this.exchangeMode, required this.onToggleMode});
+  const _ControlPanel({
+    required this.exchangeMode,
+    required this.enabled,
+    required this.onToggleMode,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(gameControllerProvider);
     final canPass =
-        controller.game.bag.isEmpty && !controller.hasPendingPlacements;
+        enabled &&
+        controller.game.bag.isEmpty &&
+        !controller.hasPendingPlacements;
 
     return Container(
       width: double.infinity,
@@ -114,7 +164,13 @@ class _ControlPanel extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          HandView(exchangeMode: exchangeMode),
+          IgnorePointer(
+            ignoring: !enabled,
+            child: Opacity(
+              opacity: enabled ? 1 : 0.5,
+              child: HandView(exchangeMode: exchangeMode),
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -122,26 +178,26 @@ class _ControlPanel extends ConsumerWidget {
             children: [
               if (!exchangeMode) ...[
                 ElevatedButton(
-                  onPressed: controller.hasPendingPlacements
+                  onPressed: enabled && controller.hasPendingPlacements
                       ? controller.confirmMove
                       : null,
                   child: const Text('Zug bestätigen'),
                 ),
                 OutlinedButton(
-                  onPressed: controller.hasPendingPlacements
+                  onPressed: enabled && controller.hasPendingPlacements
                       ? controller.resetPendingPlacements
                       : null,
                   child: const Text('Zurücknehmen'),
                 ),
               ] else
                 ElevatedButton(
-                  onPressed: controller.hasExchangeSelection
+                  onPressed: enabled && controller.hasExchangeSelection
                       ? controller.confirmExchange
                       : null,
                   child: const Text('Steine tauschen'),
                 ),
               TextButton(
-                onPressed: onToggleMode,
+                onPressed: enabled ? onToggleMode : null,
                 child: Text(exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
               ),
               if (canPass)

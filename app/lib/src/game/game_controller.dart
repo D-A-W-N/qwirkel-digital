@@ -120,4 +120,28 @@ class GameController extends ChangeNotifier {
     lastError = null;
     notifyListeners();
   }
+
+  bool get isCurrentPlayerBot => game.currentPlayer.isBot;
+
+  /// Lässt die KI des aktuellen (Bot-)Spielers ihren Zug ausführen.
+  void playBotTurn() {
+    final player = game.currentPlayer;
+    final difficulty = player.botDifficulty;
+    if (difficulty == null) return;
+
+    final decision = Bot(difficulty: difficulty).decide(game);
+    try {
+      lastMoveScore = decision.applyTo(game);
+      lastError = null;
+    } on InvalidMoveException catch (e) {
+      // Sollte bei einem vom Bot generierten Zug nicht vorkommen, aber zur
+      // Sicherheit wird ausgesetzt, damit die Partie nicht hängen bleibt.
+      lastError = e.message;
+      game.passTurn();
+    }
+    pendingPlacements.clear();
+    _handIndexByPosition.clear();
+    selectedForExchange.clear();
+    notifyListeners();
+  }
 }

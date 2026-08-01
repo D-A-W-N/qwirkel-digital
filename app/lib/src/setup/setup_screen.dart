@@ -20,6 +20,7 @@ class _SetupScreenState extends State<SetupScreen> {
 
   int _playerCount = 2;
   late final List<TextEditingController> _nameControllers;
+  late final List<BotDifficulty?> _botDifficulties;
 
   @override
   void initState() {
@@ -28,6 +29,7 @@ class _SetupScreenState extends State<SetupScreen> {
       maxPlayers,
       (i) => TextEditingController(text: 'Spieler ${i + 1}'),
     );
+    _botDifficulties = List.generate(maxPlayers, (_) => null);
   }
 
   @override
@@ -46,6 +48,7 @@ class _SetupScreenState extends State<SetupScreen> {
           name: _nameControllers[i].text.trim().isEmpty
               ? 'Spieler ${i + 1}'
               : _nameControllers[i].text.trim(),
+          botDifficulty: _botDifficulties[i],
         ),
     ];
     final game = QwirkleGame(players: players);
@@ -101,12 +104,50 @@ class _SetupScreenState extends State<SetupScreen> {
                 itemCount: _playerCount,
                 itemBuilder: (context, i) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: TextField(
-                    controller: _nameControllers[i],
-                    decoration: InputDecoration(
-                      labelText: 'Name Spieler ${i + 1}',
-                      border: const OutlineInputBorder(),
-                    ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          controller: _nameControllers[i],
+                          decoration: InputDecoration(
+                            labelText: 'Name Spieler ${i + 1}',
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<BotDifficulty?>(
+                          initialValue: _botDifficulties[i],
+                          decoration: const InputDecoration(
+                            labelText: 'Typ',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text('Mensch'),
+                            ),
+                            DropdownMenuItem(
+                              value: BotDifficulty.easy,
+                              child: Text('Bot: Leicht'),
+                            ),
+                            DropdownMenuItem(
+                              value: BotDifficulty.medium,
+                              child: Text('Bot: Mittel'),
+                            ),
+                            DropdownMenuItem(
+                              value: BotDifficulty.hard,
+                              child: Text('Bot: Schwer'),
+                            ),
+                          ],
+                          onChanged: (value) =>
+                              setState(() => _botDifficulties[i] = value),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
