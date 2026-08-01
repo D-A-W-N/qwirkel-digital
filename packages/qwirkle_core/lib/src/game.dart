@@ -62,7 +62,9 @@ class QwirkleGame {
       throw ArgumentError('Es muss mindestens ein Stein getauscht werden.');
     }
     if (tiles.length > bag.remaining) {
-      throw StateError('Der Beutel enthält nicht genug Steine für diesen Tausch.');
+      throw StateError(
+        'Der Beutel enthält nicht genug Steine für diesen Tausch.',
+      );
     }
     final player = currentPlayer;
     _requireHandContains(player, tiles);
@@ -73,6 +75,13 @@ class QwirkleGame {
     }
     player.hand.addAll(drawn);
     bag.returnTiles(tiles);
+    _advanceTurn();
+  }
+
+  /// Wechselt zum nächsten Spieler ohne Aktion (z. B. wenn kein gültiger Zug
+  /// möglich ist).
+  void passTurn() {
+    if (isOver) throw StateError('Das Spiel ist bereits beendet.');
     _advanceTurn();
   }
 

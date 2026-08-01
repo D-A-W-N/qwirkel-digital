@@ -105,10 +105,15 @@ class Board {
       }
       linesToScore.add(line.tiles);
 
-      final perpendicular =
-          axis == _Axis.horizontal ? _Axis.vertical : _Axis.horizontal;
+      final perpendicular = axis == _Axis.horizontal
+          ? _Axis.vertical
+          : _Axis.horizontal;
       for (final placement in placements) {
-        final crossLine = _collectLine(placement.position, perpendicular, merged);
+        final crossLine = _collectLine(
+          placement.position,
+          perpendicular,
+          merged,
+        );
         if (crossLine.tiles.length > 1) {
           _validateLine(crossLine);
           linesToScore.add(crossLine.tiles);

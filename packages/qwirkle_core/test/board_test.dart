@@ -22,8 +22,10 @@ void main() {
       ];
       expect(board.scorePlacement(placements), 3);
       board.apply(placements);
-      expect(board.tileAt(const Position(1, 0)),
-          const Tile(TileColor.red, TileShape.cross));
+      expect(
+        board.tileAt(const Position(1, 0)),
+        const Tile(TileColor.red, TileShape.cross),
+      );
     });
 
     test('anschließender Zug verlängert die Reihe', () {
@@ -33,9 +35,9 @@ void main() {
         _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
         _p(2, 0, const Tile(TileColor.red, TileShape.diamond)),
       ]);
-      final score = board.scorePlacement(
-        [_p(3, 0, const Tile(TileColor.red, TileShape.square))],
-      );
+      final score = board.scorePlacement([
+        _p(3, 0, const Tile(TileColor.red, TileShape.square)),
+      ]);
       expect(score, 4); // gesamte Reihe (0,0)-(3,0)
     });
 
@@ -45,15 +47,16 @@ void main() {
         _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
         _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
       ]);
-      board.apply([
-        _p(0, 1, const Tile(TileColor.blue, TileShape.circle)),
-      ]);
+      board.apply([_p(0, 1, const Tile(TileColor.blue, TileShape.circle))]);
       // Neuer Stein bei (1,1): teilt Symbol 'cross' mit (1,0) [vertikal]
       // und Farbe 'blue' mit (0,1) [horizontal].
-      final score = board.scorePlacement(
-        [_p(1, 1, const Tile(TileColor.blue, TileShape.cross))],
-      );
-      expect(score, 4); // 2 (horizontal: (0,1)+(1,1)) + 2 (vertikal: (1,0)+(1,1))
+      final score = board.scorePlacement([
+        _p(1, 1, const Tile(TileColor.blue, TileShape.cross)),
+      ]);
+      expect(
+        score,
+        4,
+      ); // 2 (horizontal: (0,1)+(1,1)) + 2 (vertikal: (1,0)+(1,1))
     });
 
     test('vollständige Reihe aus 6 Steinen gibt Qwirkle-Bonus', () {
@@ -73,12 +76,17 @@ void main() {
       final board = Board();
       final placements = [
         for (var i = 0; i < 7; i++)
-          _p(i, 0, Tile(TileColor.red, TileShape.values[i % 6]))
+          _p(i, 0, Tile(TileColor.red, TileShape.values[i % 6])),
       ];
       expect(
         () => board.scorePlacement(placements),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.tooManyTiles)),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.tooManyTiles,
+          ),
+        ),
       );
     });
 
@@ -90,8 +98,13 @@ void main() {
       ];
       expect(
         () => board.scorePlacement(placements),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.gapInLine)),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.gapInLine,
+          ),
+        ),
       );
     });
 
@@ -103,37 +116,48 @@ void main() {
       ];
       expect(
         () => board.scorePlacement(placements),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.attributeMismatch)),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.attributeMismatch,
+          ),
+        ),
       );
     });
 
     test('wirft bei doppeltem Stein in derselben Reihe', () {
       final board = Board();
-      board.apply([
-        _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
-      ]);
+      board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
       final placements = [
         _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
         _p(2, 0, const Tile(TileColor.red, TileShape.circle)),
       ];
       expect(
         () => board.scorePlacement(placements),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.duplicateTileInLine)),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.duplicateTileInLine,
+          ),
+        ),
       );
     });
 
     test('wirft, wenn Zug nicht an vorhandene Steine angrenzt', () {
       final board = Board();
-      board.apply([
-        _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
-      ]);
+      board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
       final placements = [_p(5, 5, const Tile(TileColor.blue, TileShape.star))];
       expect(
         () => board.scorePlacement(placements),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.notConnected)),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.notConnected,
+          ),
+        ),
       );
     });
 
@@ -154,8 +178,13 @@ void main() {
       ];
       expect(
         () => board.scorePlacement(placements),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.lineTooLong)),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.lineTooLong,
+          ),
+        ),
       );
     });
 
@@ -163,10 +192,16 @@ void main() {
       final board = Board();
       board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
       expect(
-        () => board.scorePlacement(
-            [_p(0, 0, const Tile(TileColor.red, TileShape.cross))]),
-        throwsA(isA<InvalidMoveException>().having(
-            (e) => e.reason, 'reason', InvalidMoveReason.positionOccupied)),
+        () => board.scorePlacement([
+          _p(0, 0, const Tile(TileColor.red, TileShape.cross)),
+        ]),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.positionOccupied,
+          ),
+        ),
       );
     });
   });

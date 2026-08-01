@@ -31,46 +31,50 @@ void main() {
       expect(game.currentPlayer, anna); // Anna hat die längere Reihe (4)
     });
 
-    test('playTiles vergibt Punkte, zieht Nachschub und wechselt den Spieler',
-        () {
-      final annaHand = [
-        const Tile(TileColor.red, TileShape.circle),
-        const Tile(TileColor.red, TileShape.cross),
-        const Tile(TileColor.red, TileShape.diamond),
-        const Tile(TileColor.blue, TileShape.star),
-        const Tile(TileColor.green, TileShape.clover),
-        const Tile(TileColor.purple, TileShape.square),
-      ];
-      final benHand = [
-        const Tile(TileColor.orange, TileShape.circle),
-        const Tile(TileColor.orange, TileShape.cross),
-        const Tile(TileColor.yellow, TileShape.diamond),
-        const Tile(TileColor.yellow, TileShape.square),
-        const Tile(TileColor.green, TileShape.star),
-        const Tile(TileColor.blue, TileShape.clover),
-      ];
-      // Zusätzliche Nachschub-Steine, die nach dem Zug gezogen werden.
-      final refill = [const Tile(TileColor.purple, TileShape.star)];
-      final bag = TileBag.fromTiles([...refill, ...benHand, ...annaHand]);
-      final anna = Player(id: 'a', name: 'Anna');
-      final ben = Player(id: 'b', name: 'Ben');
+    test(
+      'playTiles vergibt Punkte, zieht Nachschub und wechselt den Spieler',
+      () {
+        final annaHand = [
+          const Tile(TileColor.red, TileShape.circle),
+          const Tile(TileColor.red, TileShape.cross),
+          const Tile(TileColor.red, TileShape.diamond),
+          const Tile(TileColor.blue, TileShape.star),
+          const Tile(TileColor.green, TileShape.clover),
+          const Tile(TileColor.purple, TileShape.square),
+        ];
+        final benHand = [
+          const Tile(TileColor.orange, TileShape.circle),
+          const Tile(TileColor.orange, TileShape.cross),
+          const Tile(TileColor.yellow, TileShape.diamond),
+          const Tile(TileColor.yellow, TileShape.square),
+          const Tile(TileColor.green, TileShape.star),
+          const Tile(TileColor.blue, TileShape.clover),
+        ];
+        // Zusätzliche Nachschub-Steine, die nach dem Zug gezogen werden.
+        final refill = [const Tile(TileColor.purple, TileShape.star)];
+        final bag = TileBag.fromTiles([...refill, ...benHand, ...annaHand]);
+        final anna = Player(id: 'a', name: 'Anna');
+        final ben = Player(id: 'b', name: 'Ben');
 
-      final game = QwirkleGame(players: [anna, ben], bag: bag);
-      expect(game.currentPlayer, anna);
+        final game = QwirkleGame(players: [anna, ben], bag: bag);
+        expect(game.currentPlayer, anna);
 
-      final placedTile = const Tile(TileColor.red, TileShape.circle);
-      final score = game.playTiles(
-        [TilePlacement(position: const Position(0, 0), tile: placedTile)],
-      );
+        final placedTile = const Tile(TileColor.red, TileShape.circle);
+        final score = game.playTiles([
+          TilePlacement(position: const Position(0, 0), tile: placedTile),
+        ]);
 
-      expect(score, 1); // erster Zug, einzelner Stein
-      expect(anna.score, 1);
-      expect(anna.hand.contains(placedTile), isFalse);
-      expect(anna.hand.length, 6); // Nachschub gezogen
-      expect(anna.hand.contains(const Tile(TileColor.purple, TileShape.star)),
-          isTrue);
-      expect(game.currentPlayer, ben); // Zug gewechselt
-    });
+        expect(score, 1); // erster Zug, einzelner Stein
+        expect(anna.score, 1);
+        expect(anna.hand.contains(placedTile), isFalse);
+        expect(anna.hand.length, 6); // Nachschub gezogen
+        expect(
+          anna.hand.contains(const Tile(TileColor.purple, TileShape.star)),
+          isTrue,
+        );
+        expect(game.currentPlayer, ben); // Zug gewechselt
+      },
+    );
 
     test('letzter Stein bei leerem Beutel beendet das Spiel mit Bonus', () {
       final bag = TileBag.standard();
@@ -123,12 +127,28 @@ void main() {
       final toExchange = [const Tile(TileColor.red, TileShape.circle)];
       game.exchangeTiles(toExchange);
 
-      expect(anna.hand.contains(const Tile(TileColor.red, TileShape.circle)),
-          isFalse);
+      expect(
+        anna.hand.contains(const Tile(TileColor.red, TileShape.circle)),
+        isFalse,
+      );
       expect(anna.hand.length, 6);
       expect(anna.score, 0);
       expect(game.currentPlayer, ben);
       expect(bag.remaining, 1); // getauschter Stein zurück im Beutel
+    });
+
+    test('passTurn wechselt den Spieler ohne Aktion', () {
+      final bag = TileBag.standard();
+      final anna = Player(id: 'a', name: 'Anna');
+      final ben = Player(id: 'b', name: 'Ben');
+      final game = QwirkleGame(players: [anna, ben], bag: bag);
+      final before = game.currentPlayer;
+
+      game.passTurn();
+
+      expect(game.currentPlayer, isNot(before));
+      expect(anna.score, 0);
+      expect(ben.score, 0);
     });
 
     test('playTiles wirft, wenn der Spieler den Stein nicht besitzt', () {
@@ -157,9 +177,9 @@ void main() {
       // Ben's Farbe/Symbol-Kombination "yellow-diamond" ist nicht in Annas Hand.
       const foreignTile = Tile(TileColor.yellow, TileShape.diamond);
       expect(
-        () => game.playTiles(
-          [TilePlacement(position: const Position(0, 0), tile: foreignTile)],
-        ),
+        () => game.playTiles([
+          TilePlacement(position: const Position(0, 0), tile: foreignTile),
+        ]),
         throwsArgumentError,
       );
     });

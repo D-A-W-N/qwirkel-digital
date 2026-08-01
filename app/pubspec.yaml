@@ -37,6 +37,7 @@ dependencies:
 
   qwirkle_core:
     path: ../packages/qwirkle_core
+  flutter_riverpod: ^3.4.2
 
 dev_dependencies:
   flutter_test:
