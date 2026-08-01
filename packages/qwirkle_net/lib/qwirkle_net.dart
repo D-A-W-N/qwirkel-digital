@@ -10,4 +10,7 @@ export 'src/client_session.dart';
 export 'src/host_session.dart';
 export 'src/messages.dart';
 export 'src/serialization.dart';
+export 'src/signaling/signaling_client.dart';
+export 'src/signaling/signaling_messages.dart';
+export 'src/signaling/signaling_server.dart';
 export 'src/transport.dart';
