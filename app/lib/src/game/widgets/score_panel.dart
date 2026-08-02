@@ -27,7 +27,9 @@ class ScorePanel extends StatelessWidget {
           return Chip(
             avatar: active ? const Icon(Icons.play_arrow, size: 18) : null,
             label: Text('${player.name}: ${player.score}'),
-            backgroundColor: active ? Colors.amber.shade200 : null,
+            backgroundColor: active
+                ? Theme.of(context).colorScheme.tertiaryContainer
+                : null,
           );
         },
       ),
