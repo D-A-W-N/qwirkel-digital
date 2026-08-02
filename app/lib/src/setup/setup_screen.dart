@@ -173,6 +173,36 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                     subtitle: const Text('Zeigt kurze Tipps im Spiel und in der Lobby.'),
                   ),
                   const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Bot-Geschwindigkeit', style: Theme.of(context).textTheme.titleSmall),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Wie lange ein Bot vor seinem Zug "nachdenkt".',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                        SegmentedButton<BotSpeed>(
+                          segments: [
+                            for (final speed in BotSpeed.values)
+                              ButtonSegment(value: speed, label: Text(speed.label)),
+                          ],
+                          selected: {settings.botSpeed},
+                          onSelectionChanged: (selection) async {
+                            final nextSettings = ref
+                                .read(appSettingsProvider)
+                                .copyWith(botSpeed: selection.first);
+                            ref.read(appSettingsProvider.notifier).state = nextSettings;
+                            await saveAppSettings(nextSettings);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   const UpdateSettingsSection(),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -184,7 +214,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                           builder: (dialogContext) => AlertDialog(
                             title: const Text('Einstellungen zurücksetzen?'),
                             content: const Text(
-                              'Damit werden Animationen und Tipps auf die Standardwerte zurückgesetzt.',
+                              'Damit werden Animationen, Tipps und Bot-Geschwindigkeit auf die Standardwerte zurückgesetzt.',
                             ),
                             actions: [
                               TextButton(

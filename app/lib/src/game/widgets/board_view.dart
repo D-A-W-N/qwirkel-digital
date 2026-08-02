@@ -74,8 +74,14 @@ class _BoardCell extends ConsumerWidget {
     final controller = ref.watch(gameControllerProvider);
     final existing = controller.game.board.tileAt(position);
     if (existing != null) {
+      final isLastBotTile = controller.lastBotPlacements.contains(position);
       return Center(
-        child: TileView(tile: existing, size: BoardView.cellSize - 8),
+        child: TileView(
+          tile: existing,
+          size: BoardView.cellSize - 8,
+          highlighted: isLastBotTile,
+          highlightColor: Colors.amber,
+        ),
       );
     }
 
