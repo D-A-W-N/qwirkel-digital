@@ -9,6 +9,8 @@ permissions:
   contents: write
 
 jobs:
+  # Tagged commits are always pushed to main/develop first, which ci.yml
+  # already analyzes and tests, so this job builds only.
   build:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -33,6 +35,7 @@ jobs:
         with:
           channel: stable
           flutter-version: "3.44.8"
+          cache: true
 
       - name: Enable desktop targets
         run: flutter config --enable-macos-desktop --enable-linux-desktop --enable-windows-desktop
@@ -46,14 +49,6 @@ jobs:
       - name: Get dependencies
         working-directory: app
         run: flutter pub get
-
-      - name: Analyze
-        working-directory: app
-        run: flutter analyze
-
-      - name: Test
-        working-directory: app
-        run: flutter test
 
       - name: Build app
         working-directory: app
