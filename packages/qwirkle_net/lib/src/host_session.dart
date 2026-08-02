@@ -59,6 +59,12 @@ class HostSession {
   /// Zug eines Clients) - für die Host-seitige UI.
   Stream<void> get onStateChanged => _stateController.stream;
 
+  /// Feuert, wenn sich die Warteliste ändert (z. B. ein Client tritt bei) -
+  /// für die Host-seitige Lobby-Anzeige. Ohne das sieht nur der Client
+  /// (über [ClientSession.lobbyUpdates]) neue Mitspieler:innen live; der
+  /// Host müsste sonst manuell neu abfragen.
+  Stream<LobbyMessage> get lobbyUpdates => _lobbyController.stream;
+
   /// Feuert, sobald die Partie gestartet wurde.
   Stream<bool> get onGameStarted => _gameStartedController.stream;
 
@@ -240,13 +246,29 @@ class HostSession {
   }
 
   /// Führt einen Zug des Hosts (immer Index 0) aus und verteilt den neuen
-  /// Zustand an alle Clients.
-  int playHostMove(List<TilePlacement> placements) {
-    final score = _game!.playTiles(placements);
-    _skipDisconnectedPlayers();
-    _broadcastState();
-    _stateController.add(null);
-    return score;
+  /// Zustand an alle Clients. Liefert `null` (statt zu werfen) bei einem
+  /// regelwidrigen Zug — der Fehler wird stattdessen über [errors] gemeldet,
+  /// spiegelbildlich zur Behandlung von Client-Zügen in [_handleLine]. Ohne
+  /// das würde eine Exception hier unbehandelt bis in die aufrufende UI
+  /// durchschlagen und dortige Aufräumarbeiten (z. B. das Zurücksetzen der
+  /// vorläufigen Platzierung) überspringen.
+  int? playHostMove(List<TilePlacement> placements) {
+    try {
+      final score = _game!.playTiles(placements);
+      _skipDisconnectedPlayers();
+      _broadcastState();
+      _stateController.add(null);
+      return score;
+    } on InvalidMoveException catch (e) {
+      _errorController.add(e.message);
+      return null;
+    } on StateError catch (e) {
+      _errorController.add(e.message);
+      return null;
+    } on ArgumentError catch (e) {
+      _errorController.add(e.message.toString());
+      return null;
+    }
   }
 
   /// Startet eine neue Partie neu mit denselben Teilnehmern und verteilt den
@@ -273,17 +295,29 @@ class HostSession {
   }
 
   void exchangeHostTiles(List<Tile> tiles) {
-    _game!.exchangeTiles(tiles);
-    _skipDisconnectedPlayers();
-    _broadcastState();
-    _stateController.add(null);
+    try {
+      _game!.exchangeTiles(tiles);
+      _skipDisconnectedPlayers();
+      _broadcastState();
+      _stateController.add(null);
+    } on InvalidMoveException catch (e) {
+      _errorController.add(e.message);
+    } on StateError catch (e) {
+      _errorController.add(e.message);
+    } on ArgumentError catch (e) {
+      _errorController.add(e.message.toString());
+    }
   }
 
   void passHostTurn() {
-    _game!.passTurn();
-    _skipDisconnectedPlayers();
-    _broadcastState();
-    _stateController.add(null);
+    try {
+      _game!.passTurn();
+      _skipDisconnectedPlayers();
+      _broadcastState();
+      _stateController.add(null);
+    } on StateError catch (e) {
+      _errorController.add(e.message);
+    }
   }
 
   /// Spielstand aus Sicht des Hosts (Index 0) - für die Host-eigene UI.

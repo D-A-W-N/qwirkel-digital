@@ -181,5 +181,37 @@ void main() {
         expect(game.isOver, isFalse);
       },
     );
+
+    test(
+      'Host erfährt live über lobbyUpdates, wenn ein Client beitritt',
+      () async {
+        final lobbyFuture = host.lobbyUpdates.first;
+
+        final client = ClientSession();
+        addTearDown(client.close);
+        await client.connect('127.0.0.1', host.port, name: 'Ben');
+
+        final lobby = await lobbyFuture;
+
+        expect(lobby.players.map((p) => p.name), containsAll(['Host-Anna', 'Ben']));
+      },
+    );
+
+    test(
+      'playHostMove wirft nicht bei einem regelwidrigen Zug, sondern meldet über errors',
+      () async {
+        host.startGame();
+
+        final errorFuture = host.errors.first;
+        // Eine leere Platzierung ist immer ungültig, unabhängig von der
+        // (zufällig ausgeteilten) Host-Hand - deterministisch reproduzierbar.
+        final result = host.playHostMove(const []);
+        final error = await errorFuture;
+
+        expect(result, isNull);
+        expect(error, isNotEmpty);
+        expect(host.game!.board.isEmpty, isTrue);
+      },
+    );
   });
 }

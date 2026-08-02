@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
@@ -25,6 +26,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   StreamSubscription<PeerJoinedMessage>? _peerJoinedSubscription;
   final List<WebRtcConnection> _webrtcConnections = [];
   String? _inviteCode;
+  List<String> _localAddresses = const [];
   String? _status;
   List<({String id, String name})> _lobbyPlayers = const [];
   bool _isInitializing = true;
@@ -76,6 +78,10 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   Future<void> _startHosting() async {
     final host = HostSession(hostPlayerName: widget.config.effectiveName);
     _wireHostListeners(host);
+    final addresses = await _detectLocalAddresses();
+    if (mounted) {
+      setState(() => _localAddresses = addresses);
+    }
 
     if (_isLan) {
       await host.start(address: '0.0.0.0', port: widget.config.effectivePort);
@@ -107,6 +113,10 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       if (!mounted) return;
       setState(() => _status = message);
     });
+    host.lobbyUpdates.listen((message) {
+      if (!mounted) return;
+      setState(() => _lobbyPlayers = message.players);
+    });
     host.errors.listen((message) {
       if (!mounted) return;
       setState(() => _status = 'Fehler: $message');
@@ -130,6 +140,25 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         }
       });
     });
+  }
+
+  /// Ermittelt die eigenen LAN-IPv4-Adressen, damit der Host sie anzeigen
+  /// und mit Mitspieler:innen teilen kann — vorher war nirgends zu sehen,
+  /// unter welcher Adresse man selbst erreichbar ist, nur der Port.
+  Future<List<String>> _detectLocalAddresses() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLoopback: false,
+        includeLinkLocal: false,
+      );
+      return [
+        for (final interface in interfaces)
+          for (final address in interface.addresses) address.address,
+      ];
+    } on SocketException {
+      return const [];
+    }
   }
 
   /// Startet einen eigenen [SignalingServer] und verbindet einen
@@ -303,17 +332,25 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     });
   }
 
-  Future<void> _sendMove(List<TilePlacement> placements) async {
-    if (placements.isEmpty) return;
+  /// Sendet [placements] und meldet zurück, ob der Zug angenommen wurde.
+  ///
+  /// Für den Client ist das nur "erfolgreich gesendet", nicht "vom Host
+  /// bestätigt" (das kommt asynchron über [_clientSession]'s stateUpdates/
+  /// errors zurück) - für den Host dagegen ist das Ergebnis sofort bekannt,
+  /// da [HostSession.playHostMove] synchron validiert.
+  Future<bool> _sendMove(List<TilePlacement> placements) async {
+    if (placements.isEmpty) return false;
     if (_clientSession != null) {
       setState(() => _status = 'Zug wird an den Host gesendet...');
       _clientSession!.sendMove(placements);
-      return;
+      return true;
     }
     if (_hostSession != null) {
       setState(() => _status = 'Host führt den Zug aus...');
-      _hostSession!.playHostMove(placements);
+      final score = _hostSession!.playHostMove(placements);
+      return score != null;
     }
+    return false;
   }
 
   @override
@@ -347,6 +384,34 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
             if (_isInitializing)
               const Center(child: CircularProgressIndicator())
             else ...[
+              if (isHosting && _localAddresses.isNotEmpty) ...[
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.router),
+                    title: Text(
+                      _isLan ? 'Erreichbar unter' : 'Signaling-URL',
+                    ),
+                    subtitle: SelectableText(
+                      _isLan
+                          ? _localAddresses
+                              .map((address) => '$address:${_hostSession?.port ?? widget.config.effectivePort}')
+                              .join(' oder ')
+                          : _localAddresses
+                              .map((address) => 'ws://$address:${_signalingServer?.port ?? ''}')
+                              .join(' oder '),
+                    ),
+                  ),
+                ),
+                if (!_isLan)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, bottom: 4),
+                    child: Text(
+                      'Nur im selben Netzwerk direkt erreichbar. Für echte Internet-Partien muss diese Adresse von außen erreichbar sein (z. B. Portweiterleitung) oder ein extern gehosteter Signaling-Server verwendet werden.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+              ],
               if (_inviteCode != null) ...[
                 Card(
                   child: ListTile(
