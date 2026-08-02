@@ -21,6 +21,7 @@ class GameScreen extends ConsumerStatefulWidget {
 class _GameScreenState extends ConsumerState<GameScreen> {
   bool _exchangeMode = false;
   bool _gameOverShown = false;
+  bool _startAnnounced = false;
   Timer? _botTimer;
 
   @override
@@ -41,7 +42,23 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         (_) => _showGameOverDialog(context, game),
       );
     } else if (!game.isOver && controller.isCurrentPlayerBot) {
-      _scheduleBotTurn(controller);
+      _scheduleBotTurn(controller, settings.botSpeed);
+    }
+
+    if (!_startAnnounced) {
+      _startAnnounced = true;
+      final starter = game.currentPlayer;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${starter.name} beginnt (längste mögliche Reihe aus der Starthand).',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      });
     }
 
     return Scaffold(
@@ -112,6 +129,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 controller.resetPendingPlacements();
                 controller.clearExchangeSelection();
               },
+              onExchangeConfirmed: () => setState(() => _exchangeMode = false),
             ),
           ],
         ),
@@ -159,16 +177,23 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       return 'Tauschmodus aktiv – wähle Steine aus deiner Hand aus.';
     }
     if (controller.hasPendingPlacements) {
-      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.';
+      final score = controller.pendingScore;
+      final scoreSuffix = score != null
+          ? ' Aktuell $score Punkt${score == 1 ? '' : 'e'}.'
+          : '';
+      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.$scoreSuffix';
+    }
+    if (controller.lastBotSummary != null) {
+      return controller.lastBotSummary!;
     }
     return 'Wähle einen Stein aus deiner Hand und platziere ihn auf dem Brett.';
   }
 
   /// Löst den Zug einer KI-Spielerin verzögert aus (damit der Zugwechsel
   /// sichtbar bleibt) und vermeidet Mehrfachauslösung pro Build.
-  void _scheduleBotTurn(GameController controller) {
+  void _scheduleBotTurn(GameController controller, BotSpeed speed) {
     if (_botTimer != null) return;
-    _botTimer = Timer(const Duration(milliseconds: 500), () {
+    _botTimer = Timer(speed.turnDelay, () {
       _botTimer = null;
       if (!mounted) return;
       controller.playBotTurn();
@@ -210,11 +235,13 @@ class _ControlPanel extends ConsumerWidget {
   final bool exchangeMode;
   final bool enabled;
   final VoidCallback onToggleMode;
+  final VoidCallback onExchangeConfirmed;
 
   const _ControlPanel({
     required this.exchangeMode,
     required this.enabled,
     required this.onToggleMode,
+    required this.onExchangeConfirmed,
   });
 
   @override
@@ -260,7 +287,10 @@ class _ControlPanel extends ConsumerWidget {
               ] else
                 ElevatedButton(
                   onPressed: enabled && controller.hasExchangeSelection
-                      ? controller.confirmExchange
+                      ? () {
+                          controller.confirmExchange();
+                          onExchangeConfirmed();
+                        }
                       : null,
                   child: const Text('Steine tauschen'),
                 ),

@@ -19,6 +19,18 @@ class GameController extends ChangeNotifier {
   String? lastError;
   int? lastMoveScore;
 
+  /// Punktwert der aktuell vorbereiteten (noch nicht bestätigten) Steine,
+  /// live neu berechnet bei jeder Änderung von [pendingPlacements].
+  int? pendingScore;
+
+  /// Felder, die der Bot in seinem letzten Zug belegt hat (für eine kurze
+  /// visuelle Hervorhebung). Wird geleert, sobald die Gegenseite reagiert.
+  Set<Position> lastBotPlacements = {};
+
+  /// Kurze textuelle Zusammenfassung des letzten Bot-Zugs (Platzierung,
+  /// Tausch oder Aussetzen), z. B. für die Statuszeile.
+  String? lastBotSummary;
+
   GameController(this.game);
 
   bool get isOver => game.isOver;
@@ -53,10 +65,13 @@ class GameController extends ChangeNotifier {
     ];
 
     try {
-      game.board.scorePlacement(candidatePlacements);
+      final score = game.board.scorePlacement(candidatePlacements);
       pendingPlacements[position] = hand[handIndex];
       _handIndexByPosition[position] = handIndex;
+      pendingScore = score;
       lastError = null;
+      lastBotPlacements = {};
+      lastBotSummary = null;
     } on InvalidMoveException catch (e) {
       lastError = _humanReadableMessage(e.reason, e.message);
       return;
@@ -70,14 +85,32 @@ class GameController extends ChangeNotifier {
     pendingPlacements.remove(position);
     _handIndexByPosition.remove(position);
     lastError = null;
+    pendingScore = _recomputePendingScore();
     notifyListeners();
   }
 
   void resetPendingPlacements() {
     pendingPlacements.clear();
     _handIndexByPosition.clear();
+    pendingScore = null;
     lastError = null;
     notifyListeners();
+  }
+
+  /// Berechnet den Punktwert der verbliebenen [pendingPlacements] neu (z. B.
+  /// nach einem [unstageTile]) - liefert `null`, falls die verbleibenden
+  /// Steine für sich genommen (noch) keinen gültigen Zug ergeben.
+  int? _recomputePendingScore() {
+    if (pendingPlacements.isEmpty) return null;
+    final placements = [
+      for (final entry in pendingPlacements.entries)
+        TilePlacement(position: entry.key, tile: entry.value),
+    ];
+    try {
+      return game.board.scorePlacement(placements);
+    } on InvalidMoveException {
+      return null;
+    }
   }
 
   /// Bestätigt den vorläufigen Zug und übergibt ihn an die Engine.
@@ -92,6 +125,7 @@ class GameController extends ChangeNotifier {
       lastError = null;
       pendingPlacements.clear();
       _handIndexByPosition.clear();
+      pendingScore = null;
     } on InvalidMoveException catch (e) {
       lastError = _humanReadableMessage(e.reason, e.message);
     }
@@ -119,6 +153,8 @@ class GameController extends ChangeNotifier {
     try {
       game.exchangeTiles(tiles);
       lastError = null;
+      lastBotPlacements = {};
+      lastBotSummary = null;
     } on Object catch (e) {
       lastError = e.toString();
     }
@@ -132,6 +168,8 @@ class GameController extends ChangeNotifier {
     _handIndexByPosition.clear();
     selectedForExchange.clear();
     lastError = null;
+    lastBotPlacements = {};
+    lastBotSummary = null;
     notifyListeners();
   }
 
@@ -173,10 +211,28 @@ class GameController extends ChangeNotifier {
     try {
       lastMoveScore = decision.applyTo(game);
       lastError = null;
+      if (decision.isPlay) {
+        final placements = decision.placements!;
+        lastBotPlacements = placements.map((p) => p.position).toSet();
+        final count = placements.length;
+        lastBotSummary =
+            '${player.name} legte $count Stein${count == 1 ? '' : 'e'} '
+            '(+${lastMoveScore ?? 0} Punkte).';
+      } else if (decision.isExchange) {
+        final count = decision.exchangeTiles!.length;
+        lastBotPlacements = {};
+        lastBotSummary =
+            '${player.name} tauschte $count Stein${count == 1 ? '' : 'e'}.';
+      } else {
+        lastBotPlacements = {};
+        lastBotSummary = '${player.name} setzte aus.';
+      }
     } on InvalidMoveException catch (e) {
       // Sollte bei einem vom Bot generierten Zug nicht vorkommen, aber zur
       // Sicherheit wird ausgesetzt, damit die Partie nicht hängen bleibt.
       lastError = _humanReadableMessage(e.reason, e.message);
+      lastBotPlacements = {};
+      lastBotSummary = null;
       game.passTurn();
     }
     pendingPlacements.clear();
