@@ -27,4 +27,36 @@ void main() {
     expect(controller.lastError, isNotNull);
     expect(controller.lastError, contains('lückenlos'));
   });
+
+  test('unstageTile löscht eine veraltete Fehlermeldung einer vorherigen fehlgeschlagenen Platzierung', () {
+    final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
+    final controller = GameController(game);
+
+    game.currentPlayer.hand = [
+      const Tile(TileColor.red, TileShape.circle),
+      const Tile(TileColor.red, TileShape.cross),
+    ];
+    game.board.apply([
+      TilePlacement(
+        position: const Position(0, 0),
+        tile: const Tile(TileColor.red, TileShape.diamond),
+      ),
+    ]);
+
+    controller.stageTile(0, const Position(1, 0));
+    controller.stageTile(1, const Position(3, 0)); // schlägt fehl (Lücke bei 2,0)
+    expect(controller.lastError, isNotNull);
+
+    // Der Zug wird abgebrochen: der einzige vorläufige Stein wird zurückgenommen.
+    controller.unstageTile(const Position(1, 0));
+
+    expect(controller.pendingPlacements, isEmpty);
+    expect(
+      controller.lastError,
+      isNull,
+      reason:
+          'Nach dem Zurücknehmen darf keine Fehlermeldung mehr angezeigt werden, '
+          'die sich auf den bereits verworfenen Versuch bezieht.',
+    );
+  });
 }

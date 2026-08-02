@@ -99,11 +99,16 @@ class _BoardCell extends ConsumerWidget {
           controller.stageTile(details.data, position),
       builder: (context, candidateData, rejectedData) {
         final active = candidateData.isNotEmpty;
+        final colorScheme = Theme.of(context).colorScheme;
         return Container(
           margin: const EdgeInsets.all(1),
           decoration: BoxDecoration(
-            color: active ? Colors.white24 : Colors.transparent,
-            border: Border.all(color: Colors.white10),
+            color: active ? colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+            border: Border.all(
+              color: active
+                  ? colorScheme.primary.withValues(alpha: 0.6)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
+            ),
           ),
         );
       },

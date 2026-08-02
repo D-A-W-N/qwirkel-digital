@@ -69,6 +69,7 @@ class GameController extends ChangeNotifier {
   void unstageTile(Position position) {
     pendingPlacements.remove(position);
     _handIndexByPosition.remove(position);
+    lastError = null;
     notifyListeners();
   }
 
