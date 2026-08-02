@@ -68,11 +68,23 @@ class ClientSession {
     required String name,
   }) async {
     _transport = transport;
-    _subscription = transport.lines.listen(_handleLine);
+    _subscription = transport.lines.listen(
+      _handleLine,
+      onDone: _handleDisconnect,
+      onError: (_) => _handleDisconnect(),
+    );
     _statusController.add('Tritt der Lobby bei');
     transport.send(JoinMessage(name).encode());
     await _welcomeController.stream.first;
     _statusController.add('Lobby-Beitritt bestätigt');
+  }
+
+  /// Feuert, wenn der Transport ohne aktives [close] endet (z. B. der Host
+  /// ist abgestürzt oder die Verbindung wurde unterbrochen) — ohne das würde
+  /// die UI einfach auf dem letzten Stand einfrieren, ohne jede Rückmeldung.
+  void _handleDisconnect() {
+    _errorController.add('Verbindung zum Host verloren.');
+    _statusController.add('Verbindung zum Host verloren');
   }
 
   void _handleLine(String line) {
