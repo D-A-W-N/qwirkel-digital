@@ -24,6 +24,7 @@ void main() {
     expect(container.read(appSettingsProvider).animationsEnabled, isTrue);
     expect(container.read(appSettingsProvider).tipsEnabled, isTrue);
     expect(container.read(appSettingsProvider).updateCheckEnabled, isTrue);
+    expect(container.read(appSettingsProvider).botSpeed, BotSpeed.normal);
 
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
@@ -34,11 +35,15 @@ void main() {
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
         .copyWith(updateCheckEnabled: false);
+    container.read(appSettingsProvider.notifier).state = container
+        .read(appSettingsProvider)
+        .copyWith(botSpeed: BotSpeed.fast);
 
     final settings = container.read(appSettingsProvider);
     expect(settings.animationsEnabled, isFalse);
     expect(settings.tipsEnabled, isFalse);
     expect(settings.updateCheckEnabled, isFalse);
+    expect(settings.botSpeed, BotSpeed.fast);
   });
 
   test('App-Settings können auf Standardwerte zurückgesetzt werden', () async {
@@ -51,6 +56,7 @@ void main() {
           animationsEnabled: false,
           tipsEnabled: false,
           updateCheckEnabled: false,
+          botSpeed: BotSpeed.slow,
         );
 
     try {
@@ -62,6 +68,7 @@ void main() {
       expect(settings.animationsEnabled, isTrue);
       expect(settings.tipsEnabled, isTrue);
       expect(settings.updateCheckEnabled, isTrue);
+      expect(settings.botSpeed, BotSpeed.normal);
       return;
     }
 
@@ -69,5 +76,6 @@ void main() {
     expect(settings.animationsEnabled, isTrue);
     expect(settings.tipsEnabled, isTrue);
     expect(settings.updateCheckEnabled, isTrue);
+    expect(settings.botSpeed, BotSpeed.normal);
   });
 }

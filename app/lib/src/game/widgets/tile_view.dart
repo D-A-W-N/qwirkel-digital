@@ -24,12 +24,14 @@ class TileView extends StatelessWidget {
   final Tile tile;
   final double size;
   final bool highlighted;
+  final Color highlightColor;
 
   const TileView({
     super.key,
     required this.tile,
     this.size = 40,
     this.highlighted = false,
+    this.highlightColor = Colors.white,
   });
 
   @override
@@ -42,7 +44,7 @@ class TileView extends StatelessWidget {
         color: const Color(0xFF222222),
         borderRadius: BorderRadius.circular(size * 0.15),
         border: highlighted
-            ? Border.all(color: Colors.white, width: 2)
+            ? Border.all(color: highlightColor, width: 2)
             : Border.all(color: Colors.black54, width: 1),
       ),
       padding: EdgeInsets.all(size * 0.16),
