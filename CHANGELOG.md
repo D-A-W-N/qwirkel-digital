@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-02
+
+- Show the live point value of the currently staged (unconfirmed) placement during your turn
+- Added a bot-speed setting (langsam/normal/schnell) for how long a bot "thinks" before its move
+- Bot's last placed tiles are now briefly highlighted, and the status bar summarizes what it did (placement/exchange/pass, with points)
+- Fixed exchanging tiles not visibly ending the turn (the engine already advanced it, but the UI's exchange-mode state never reset)
+- The starting player and the house-rule reason (longest possible run from the starting hand) are now announced at the start of a game
+
 ## [0.6.0] - 2026-08-02
 
 - Bot AI now also plays T-/L-shaped moves under the multi-direction house rule (previously only straight lines, even though human players could already bend a move)
