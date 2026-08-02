@@ -62,6 +62,12 @@ class WindowsUpdateApplier implements UpdateApplier {
     );
     await verifyChecksum(file: zip, expectedHex: expectedHex);
 
+    // Expand-Archive refuses to process a file that doesn't literally end
+    // in ".zip" (throws NotSupportedArchiveFileExtension), regardless of
+    // actual content — but downloadAssetNextTo() names the download
+    // `.qwirkle-update-download` with no extension. Give it one.
+    final renamedZip = await zip.rename('${zip.path}.zip');
+
     final extractDir = Directory(_extractDirPath);
     if (await extractDir.exists()) {
       await extractDir.delete(recursive: true);
@@ -77,14 +83,14 @@ class WindowsUpdateApplier implements UpdateApplier {
       '-ExecutionPolicy',
       'Bypass',
       '-Command',
-      'Expand-Archive -LiteralPath ${_psQuote(zip.path)} '
+      'Expand-Archive -LiteralPath ${_psQuote(renamedZip.path)} '
           '-DestinationPath ${_psQuote(extractDir.path)} -Force',
     ]);
     if (result.exitCode != 0) {
       throw UpdateApplyException('Entpacken fehlgeschlagen: ${result.stderr}');
     }
 
-    await zip.delete();
+    await renamedZip.delete();
   }
 
   @override
@@ -138,6 +144,15 @@ class WindowsUpdateApplier implements UpdateApplier {
     );
     if (await extractDir.exists()) {
       await extractDir.delete(recursive: true);
+    }
+    // A crash between the rename-to-".zip" step and its deletion in
+    // prepare() would otherwise leave this orphaned forever — unlike the
+    // un-renamed download, a fresh prepare() attempt never touches this name.
+    final staleRenamedZip = File(
+      p.join(p.dirname(bundleDir), '.qwirkle-update-download.zip'),
+    );
+    if (await staleRenamedZip.exists()) {
+      await staleRenamedZip.delete();
     }
   }
 }
