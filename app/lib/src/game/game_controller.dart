@@ -150,8 +150,6 @@ class GameController extends ChangeNotifier {
         return 'Ein Feld kann im selben Zug nur einmal belegt werden.';
       case InvalidMoveReason.positionOccupied:
         return 'Dieses Feld ist bereits belegt.';
-      case InvalidMoveReason.notInLine:
-        return 'Die Steine eines Zuges müssen in einer Reihe oder Spalte liegen.';
       case InvalidMoveReason.gapInLine:
         return 'Die Steine müssen lückenlos aneinander anschließen.';
       case InvalidMoveReason.notConnected:

@@ -65,58 +65,15 @@ class Board {
       for (final placement in placements) placement.position: placement.tile,
     };
 
-    _Axis? axis;
-    if (placements.length > 1) {
-      final firstPos = placements.first.position;
-      final sameRow = placements.every((p) => p.position.y == firstPos.y);
-      final sameCol = placements.every((p) => p.position.x == firstPos.x);
-      if (!sameRow && !sameCol) {
-        throw const InvalidMoveException(
-          InvalidMoveReason.notInLine,
-          'Alle Steine eines Zugs müssen in einer Reihe oder Spalte liegen.',
-        );
-      }
-      axis = sameRow ? _Axis.horizontal : _Axis.vertical;
-    }
-
-    final linesToScore = <List<Tile>>[];
-
-    if (axis != null) {
-      final line = _collectLineForPlacements(placements, axis, merged);
-      _validateLine(line);
-      final linePositions = line.positions.toSet();
-      for (final placement in placements) {
-        if (!linePositions.contains(placement.position)) {
-          throw const InvalidMoveException(
-            InvalidMoveReason.gapInLine,
-            'Die platzierten Steine sind nicht lückenlos verbunden.',
-          );
-        }
-      }
-      linesToScore.add(line.tiles);
-
-      final perpendicular = axis == _Axis.horizontal
-          ? _Axis.vertical
-          : _Axis.horizontal;
-      for (final placement in placements) {
-        final crossLine = _collectLine(
-          placement.position,
-          perpendicular,
-          merged,
-        );
-        if (crossLine.tiles.length > 1) {
-          _validateLine(crossLine);
-          linesToScore.add(crossLine.tiles);
-        }
-      }
-    } else {
-      for (final dir in _Axis.values) {
-        final line = _collectLine(placements.first.position, dir, merged);
-        if (line.tiles.length > 1) {
-          _validateLine(line);
-          linesToScore.add(line.tiles);
-        }
-      }
+    // Die neu platzierten Steine müssen lückenlos zusammenhängen (direkt
+    // oder über bereits vorhandene Steine als Brücke), dürfen dabei aber -
+    // anders als im offiziellen Regelwerk - die Richtung wechseln, z. B.
+    // eine T- oder L-Form in einem Zug bilden.
+    if (positions.length > 1 && !_areOrthogonallyConnected(positions, merged)) {
+      throw const InvalidMoveException(
+        InvalidMoveReason.gapInLine,
+        'Die platzierten Steine sind nicht lückenlos verbunden.',
+      );
     }
 
     if (!firstMove) {
@@ -126,6 +83,23 @@ class Board {
           InvalidMoveReason.notConnected,
           'Mindestens ein platzierter Stein muss an einen vorhandenen Stein angrenzen.',
         );
+      }
+    }
+
+    // Jeder neue Stein wertet seine eigene horizontale und vertikale Reihe.
+    // Reihen, die von mehreren neuen Steinen gemeinsam genutzt werden (der
+    // Normalfall bei einer einzelnen geraden Reihe), werden über ihre
+    // Startposition dedupliziert und nur einmal gewertet.
+    final linesToScore = <List<Tile>>[];
+    final scoredLineKeys = <String>{};
+    for (final placement in placements) {
+      for (final axis in _Axis.values) {
+        final line = _collectLine(placement.position, axis, merged);
+        if (line.tiles.length <= 1) continue;
+        final key = '$axis:${line.positions.first}';
+        if (!scoredLineKeys.add(key)) continue;
+        _validateLine(line);
+        linesToScore.add(line.tiles);
       }
     }
 
@@ -158,6 +132,33 @@ class Board {
         _cells.containsKey(position.translate(0, -1));
   }
 
+  /// Prüft, ob alle [positions] direkt oder über andere belegte Felder in
+  /// [merged] (neue oder bereits vorhandene Steine) orthogonal miteinander
+  /// verbunden sind - erlaubt beliebige zusammenhängende Formen (nicht nur
+  /// eine gerade Reihe) für die neu platzierten Steine eines Zugs.
+  bool _areOrthogonallyConnected(
+    Set<Position> positions,
+    Map<Position, Tile> merged,
+  ) {
+    final start = positions.first;
+    final visited = <Position>{start};
+    final queue = [start];
+    while (queue.isNotEmpty) {
+      final current = queue.removeLast();
+      for (final neighbor in [
+        current.translate(1, 0),
+        current.translate(-1, 0),
+        current.translate(0, 1),
+        current.translate(0, -1),
+      ]) {
+        if (merged.containsKey(neighbor) && visited.add(neighbor)) {
+          queue.add(neighbor);
+        }
+      }
+    }
+    return positions.every(visited.contains);
+  }
+
   _Line _collectLine(Position start, _Axis axis, Map<Position, Tile> merged) {
     final dx = axis == _Axis.horizontal ? 1 : 0;
     final dy = axis == _Axis.horizontal ? 0 : 1;
@@ -177,59 +178,6 @@ class Board {
     while (true) {
       positions.add(current);
       tiles.add(merged[current]!);
-      if (current == maxPos) break;
-      current = current.translate(dx, dy);
-    }
-    return _Line(positions, tiles);
-  }
-
-  _Line _collectLineForPlacements(
-    List<TilePlacement> placements,
-    _Axis axis,
-    Map<Position, Tile> merged,
-  ) {
-    final dx = axis == _Axis.horizontal ? 1 : 0;
-    final dy = axis == _Axis.horizontal ? 0 : 1;
-
-    var minPos = placements.first.position;
-    var maxPos = placements.first.position;
-    for (final placement in placements.skip(1)) {
-      final pos = placement.position;
-      if (axis == _Axis.horizontal) {
-        if (pos.x < minPos.x) {
-          minPos = pos;
-        } else if (pos.x > maxPos.x) {
-          maxPos = pos;
-        }
-      } else {
-        if (pos.y < minPos.y) {
-          minPos = pos;
-        } else if (pos.y > maxPos.y) {
-          maxPos = pos;
-        }
-      }
-    }
-
-    while (merged.containsKey(minPos.translate(-dx, -dy))) {
-      minPos = minPos.translate(-dx, -dy);
-    }
-    while (merged.containsKey(maxPos.translate(dx, dy))) {
-      maxPos = maxPos.translate(dx, dy);
-    }
-
-    final positions = <Position>[];
-    final tiles = <Tile>[];
-    var current = minPos;
-    while (true) {
-      final tile = merged[current];
-      if (tile == null) {
-        throw const InvalidMoveException(
-          InvalidMoveReason.gapInLine,
-          'Die platzierten Steine sind nicht lückenlos verbunden.',
-        );
-      }
-      positions.add(current);
-      tiles.add(tile);
       if (current == maxPos) break;
       current = current.translate(dx, dy);
     }
