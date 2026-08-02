@@ -46,9 +46,22 @@ class GameController extends ChangeNotifier {
     if (pendingPlacements.containsKey(position)) return;
     if (_handIndexByPosition.containsValue(handIndex)) return;
 
-    pendingPlacements[position] = hand[handIndex];
-    _handIndexByPosition[position] = handIndex;
-    lastError = null;
+    final candidatePlacements = [
+      for (final entry in pendingPlacements.entries)
+        TilePlacement(position: entry.key, tile: entry.value),
+      TilePlacement(position: position, tile: hand[handIndex]),
+    ];
+
+    try {
+      game.board.scorePlacement(candidatePlacements);
+      pendingPlacements[position] = hand[handIndex];
+      _handIndexByPosition[position] = handIndex;
+      lastError = null;
+    } on InvalidMoveException catch (e) {
+      lastError = _humanReadableMessage(e.reason, e.message);
+      return;
+    }
+
     notifyListeners();
   }
 
@@ -79,7 +92,7 @@ class GameController extends ChangeNotifier {
       pendingPlacements.clear();
       _handIndexByPosition.clear();
     } on InvalidMoveException catch (e) {
-      lastError = e.message;
+      lastError = _humanReadableMessage(e.reason, e.message);
     }
     notifyListeners();
   }
@@ -123,6 +136,34 @@ class GameController extends ChangeNotifier {
 
   bool get isCurrentPlayerBot => game.currentPlayer.isBot;
 
+  String _humanReadableMessage(
+    InvalidMoveReason reason,
+    String fallback,
+  ) {
+    switch (reason) {
+      case InvalidMoveReason.emptyPlacement:
+        return 'Bitte platziere mindestens einen Stein.';
+      case InvalidMoveReason.tooManyTiles:
+        return 'Ein Zug kann maximal 6 Steine enthalten.';
+      case InvalidMoveReason.duplicatePosition:
+        return 'Ein Feld kann im selben Zug nur einmal belegt werden.';
+      case InvalidMoveReason.positionOccupied:
+        return 'Dieses Feld ist bereits belegt.';
+      case InvalidMoveReason.notInLine:
+        return 'Die Steine eines Zuges müssen in einer Reihe oder Spalte liegen.';
+      case InvalidMoveReason.gapInLine:
+        return 'Die Steine müssen lückenlos aneinander anschließen.';
+      case InvalidMoveReason.notConnected:
+        return 'Mindestens ein neuer Stein muss an einen bestehenden Stein angrenzen.';
+      case InvalidMoveReason.attributeMismatch:
+        return 'Eine Reihe braucht entweder gleiche Farben oder gleiche Formen.';
+      case InvalidMoveReason.duplicateTileInLine:
+        return 'In einer Reihe darf derselbe Stein nicht mehrfach vorkommen.';
+      case InvalidMoveReason.lineTooLong:
+        return 'Eine Reihe darf höchstens 6 Steine haben.';
+    }
+  }
+
   /// Lässt die KI des aktuellen (Bot-)Spielers ihren Zug ausführen.
   void playBotTurn() {
     final player = game.currentPlayer;
@@ -136,7 +177,7 @@ class GameController extends ChangeNotifier {
     } on InvalidMoveException catch (e) {
       // Sollte bei einem vom Bot generierten Zug nicht vorkommen, aber zur
       // Sicherheit wird ausgesetzt, damit die Partie nicht hängen bleibt.
-      lastError = e.message;
+      lastError = _humanReadableMessage(e.reason, e.message);
       game.passTurn();
     }
     pendingPlacements.clear();

@@ -79,20 +79,10 @@ class Board {
       axis = sameRow ? _Axis.horizontal : _Axis.vertical;
     }
 
-    if (!firstMove) {
-      final connected = placements.any((p) => _hasExistingNeighbor(p.position));
-      if (!connected) {
-        throw const InvalidMoveException(
-          InvalidMoveReason.notConnected,
-          'Mindestens ein platzierter Stein muss an einen vorhandenen Stein angrenzen.',
-        );
-      }
-    }
-
     final linesToScore = <List<Tile>>[];
 
     if (axis != null) {
-      final line = _collectLine(placements.first.position, axis, merged);
+      final line = _collectLineForPlacements(placements, axis, merged);
       _validateLine(line);
       final linePositions = line.positions.toSet();
       for (final placement in placements) {
@@ -126,6 +116,16 @@ class Board {
           _validateLine(line);
           linesToScore.add(line.tiles);
         }
+      }
+    }
+
+    if (!firstMove) {
+      final connected = placements.any((p) => _hasExistingNeighbor(p.position));
+      if (!connected) {
+        throw const InvalidMoveException(
+          InvalidMoveReason.notConnected,
+          'Mindestens ein platzierter Stein muss an einen vorhandenen Stein angrenzen.',
+        );
       }
     }
 
@@ -177,6 +177,59 @@ class Board {
     while (true) {
       positions.add(current);
       tiles.add(merged[current]!);
+      if (current == maxPos) break;
+      current = current.translate(dx, dy);
+    }
+    return _Line(positions, tiles);
+  }
+
+  _Line _collectLineForPlacements(
+    List<TilePlacement> placements,
+    _Axis axis,
+    Map<Position, Tile> merged,
+  ) {
+    final dx = axis == _Axis.horizontal ? 1 : 0;
+    final dy = axis == _Axis.horizontal ? 0 : 1;
+
+    var minPos = placements.first.position;
+    var maxPos = placements.first.position;
+    for (final placement in placements.skip(1)) {
+      final pos = placement.position;
+      if (axis == _Axis.horizontal) {
+        if (pos.x < minPos.x) {
+          minPos = pos;
+        } else if (pos.x > maxPos.x) {
+          maxPos = pos;
+        }
+      } else {
+        if (pos.y < minPos.y) {
+          minPos = pos;
+        } else if (pos.y > maxPos.y) {
+          maxPos = pos;
+        }
+      }
+    }
+
+    while (merged.containsKey(minPos.translate(-dx, -dy))) {
+      minPos = minPos.translate(-dx, -dy);
+    }
+    while (merged.containsKey(maxPos.translate(dx, dy))) {
+      maxPos = maxPos.translate(dx, dy);
+    }
+
+    final positions = <Position>[];
+    final tiles = <Tile>[];
+    var current = minPos;
+    while (true) {
+      final tile = merged[current];
+      if (tile == null) {
+        throw const InvalidMoveException(
+          InvalidMoveReason.gapInLine,
+          'Die platzierten Steine sind nicht lückenlos verbunden.',
+        );
+      }
+      positions.add(current);
+      tiles.add(tile);
       if (current == maxPos) break;
       current = current.translate(dx, dy);
     }
