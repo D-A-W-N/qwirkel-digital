@@ -46,6 +46,21 @@ void main() {
       expect(selected.checksumAsset.name, 'qwirkle-digital-linux.tar.gz.sha256');
     });
 
+    test('picks the Windows asset and its checksum sidecar', () {
+      final release = _releaseWithAssets([
+        'qwirkle-digital-windows.zip',
+        'qwirkle-digital-windows.zip.sha256',
+        'qwirkle-digital-linux.tar.gz',
+        'qwirkle-digital-linux.tar.gz.sha256',
+      ]);
+
+      final selected = selectAssetForPlatform(release, UpdateTargetPlatform.windows);
+
+      expect(selected, isNotNull);
+      expect(selected!.asset.name, 'qwirkle-digital-windows.zip');
+      expect(selected.checksumAsset.name, 'qwirkle-digital-windows.zip.sha256');
+    });
+
     test('returns null for an unsupported platform', () {
       final release = _releaseWithAssets([
         'qwirkle-digital-macos.zip',

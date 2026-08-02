@@ -1,6 +1,10 @@
 # Plan: Windows-Support für den In-App-Updater
 
-Noch nicht umgesetzt — zur Weiterentwicklung auf einer echten Windows-Maschine, wo sich der Mechanismus tatsächlich testen lässt (von macOS aus nicht möglich).
+**Status: Umgesetzt am 2026-08-02** auf einer echten Windows-Maschine. Voller End-to-End-Zyklus mit dem echten Release-Build verifiziert: alte Version läuft, `prepare()` legt das Entpack-Verzeichnis parallel an, `confirmApply()` startet das Helper-Skript, die alte Exe beendet sich, Wait-Process/Copy-Item/Neustart laufen mit echten Pfaden (inkl. Leerzeichen) und echten DLLs durch, Entpack-Verzeichnis und Skript räumen sich selbst auf.
+
+**Dabei gefundener und behobener Bug**: `confirmApply()` startete das Helper-Skript ursprünglich mit `ProcessStartMode.detached`. Auf echtem Windows zeigte sich, dass `powershell.exe` in diesem Modus (kein Konsolen-Handle) sofort beendet wird, bevor auch nur die erste Skriptzeile läuft — vermutlich weil der PowerShell-Konsolen-Host ohne jede Konsole nicht initialisieren kann. Das wäre von macOS aus nicht auffindbar gewesen. Fix: `ProcessStartMode.normal` (mit `-WindowStyle Hidden`) — unter Windows ist ein Kindprozess ohnehin nicht an die Lebensdauer des Elternprozesses gebunden (anders als bei Unix-Prozessgruppen), er überlebt das `exit(0)` der App problemlos.
+
+Noch ausstehend — wie beim macOS-Pfad — ist der erste echte Release-Zyklus: ältere Version installieren und in der App gegen einen neuen Tag aktualisieren.
 
 ## Context
 
@@ -53,7 +57,7 @@ await Process.start(
     '-TargetDir', _bundleDir,
     '-ExeName', _exeName,
   ],
-  mode: ProcessStartMode.detached,
+  mode: ProcessStartMode.normal, // NICHT .detached, siehe Status oben
 );
 exit(0);
 ```

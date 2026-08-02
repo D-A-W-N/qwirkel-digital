@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:qwirkle_digital/src/update/update_applier_linux.dart';
 import 'package:qwirkle_digital/src/update/update_applier_macos.dart';
+import 'package:qwirkle_digital/src/update/update_applier_windows.dart';
 
 // Regression test for a startup crash shipped in v0.3.0: cleanupStaleBackup()
 // is called unconditionally on every app launch (see
@@ -29,6 +30,19 @@ void main() {
     'LinuxUpdateApplier.cleanupStaleBackup works without prepare() having run first',
     () async {
       final applier = LinuxUpdateApplier(http.Client());
+      try {
+        await applier.cleanupStaleBackup();
+      } catch (e) {
+        // See above.
+        expect(e.toString(), isNot(contains('LateInitializationError')));
+      }
+    },
+  );
+
+  test(
+    'WindowsUpdateApplier.cleanupStaleBackup works without prepare() having run first',
+    () async {
+      final applier = WindowsUpdateApplier(http.Client());
       try {
         await applier.cleanupStaleBackup();
       } catch (e) {

@@ -17,7 +17,7 @@ Qwirkle Digital ist eine native Desktop-Anwendung für das bekannte Legespiel Qw
 
 ## Voraussetzungen
 
-- Flutter SDK 3.24 oder neuer
+- Flutter SDK 3.44 oder neuer (CI baut aktuell mit 3.44.8)
 - Dart SDK passend zur Flutter-Version
 - Für macOS: Xcode und Command Line Tools
 - Für Linux/Windows: die jeweiligen Desktop-Toolchains für Flutter
@@ -72,12 +72,7 @@ Die genaue Arbeitsweise ist in [docs/branching/README.md](docs/branching/README.
 
 ## Release-Checkliste
 
-- [x] macOS-Release-Build ist lokal vorbereitet
-- [x] Desktop-Workflow und CI-Datei sind angelegt
-- [ ] finale App-Icons und Splash-Assets ergänzen
-- [ ] macOS Signing/Notarization vorbereiten
-- [ ] Linux- und Windows-Release auf echten Hosts verifizieren
-- [ ] Installer/Package-Workflow für Distribution definieren
+Siehe [docs/platform_release_checklist.md](docs/platform_release_checklist.md) für den aktuellen Stand pro Plattform.
 
 ## Installation (fertige Builds)
 
@@ -85,7 +80,7 @@ Fertige Builds für macOS, Linux und Windows gibt es unter [GitHub Releases](htt
 
 - **macOS**: Die App ist nicht signiert/notarisiert. Beim ersten Start blockiert Gatekeeper sie als "nicht verifizierter Entwickler" — über Rechtsklick → Öffnen (oder Systemeinstellungen → Datenschutz & Sicherheit) trotzdem starten.
 - **Linux/Windows**: Archiv entpacken, ausführbare Datei starten.
-- **Updates**: Auf macOS und Linux prüft die App selbst auf neue Versionen und kann sich per Klick aktualisieren (Einstellungen → "Nach Updates suchen"). Für Windows gibt es das nicht — dort müssen neue Releases manuell heruntergeladen werden.
+- **Updates**: Auf macOS, Linux und Windows prüft die App selbst auf neue Versionen und kann sich per Klick aktualisieren (Einstellungen → "Nach Updates suchen").
 
 ## Beitragen
 
