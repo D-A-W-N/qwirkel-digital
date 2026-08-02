@@ -8,8 +8,9 @@ import 'update_models.dart';
 
 /// Applies a previously-checked update: downloads it, verifies it, extracts
 /// it, and on explicit confirmation swaps it into place and relaunches the
-/// app. Implemented per-platform (macOS/Linux); [update_controller.dart]
-/// depends only on this interface so it can be tested with a fake.
+/// app. Implemented per-platform (macOS/Linux/Windows);
+/// [update_controller.dart] depends only on this interface so it can be
+/// tested with a fake.
 abstract class UpdateApplier {
   Future<void> prepare({
     required ReleaseAsset asset,

@@ -6,6 +6,7 @@ import 'github_release_client.dart';
 import 'update_applier.dart';
 import 'update_applier_linux.dart';
 import 'update_applier_macos.dart';
+import 'update_applier_windows.dart';
 import 'update_asset_selector.dart';
 import 'update_models.dart';
 import 'update_prefs.dart';
@@ -26,6 +27,8 @@ final updateApplierProvider = Provider<UpdateApplier>((ref) {
       return MacosUpdateApplier(client);
     case UpdateTargetPlatform.linux:
       return LinuxUpdateApplier(client);
+    case UpdateTargetPlatform.windows:
+      return WindowsUpdateApplier(client);
     case UpdateTargetPlatform.unsupported:
       return _UnsupportedUpdateApplier();
   }
