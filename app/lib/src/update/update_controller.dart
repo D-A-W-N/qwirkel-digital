@@ -19,9 +19,16 @@ final githubReleaseClientProvider = Provider<GithubReleaseClient>((ref) {
 
 final updatePrefsProvider = Provider<UpdatePrefs>((ref) => UpdatePrefs());
 
+/// Overridable in Tests, damit sie nicht vom tatsächlichen Host-Betriebs-
+/// system abhängen (z. B. CI-Runner unter Windows, wo der Updater als
+/// [UpdateTargetPlatform.unsupported] gilt).
+final targetPlatformProvider = Provider<UpdateTargetPlatform>(
+  (ref) => currentTargetPlatform(),
+);
+
 final updateApplierProvider = Provider<UpdateApplier>((ref) {
   final client = ref.watch(httpClientProvider);
-  switch (currentTargetPlatform()) {
+  switch (ref.watch(targetPlatformProvider)) {
     case UpdateTargetPlatform.macos:
       return MacosUpdateApplier(client);
     case UpdateTargetPlatform.linux:
@@ -55,7 +62,7 @@ class UpdateController extends Notifier<UpdateState> {
   Future<void> checkForUpdate() async {
     if (_isInFlight) return;
 
-    final platform = currentTargetPlatform();
+    final platform = ref.read(targetPlatformProvider);
     if (platform == UpdateTargetPlatform.unsupported) {
       state = state.copyWith(phase: UpdatePhase.upToDate);
       return;

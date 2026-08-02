@@ -80,6 +80,11 @@ void main() {
       overrides: [
         httpClientProvider.overrideWithValue(client),
         updateApplierProvider.overrideWithValue(applier),
+        // Fest auf eine unterstützte Plattform gesetzt, damit die Tests
+        // unabhängig vom tatsächlichen Host-Betriebssystem laufen (z. B.
+        // CI-Runner unter Windows, wo der Updater sonst als
+        // UpdateTargetPlatform.unsupported gelten würde).
+        targetPlatformProvider.overrideWithValue(UpdateTargetPlatform.macos),
       ],
     );
     addTearDown(container.dispose);
