@@ -239,7 +239,7 @@ void main() {
       );
     });
 
-    test('wirft, wenn die Steine weder in einer Reihe noch einer Spalte liegen', () {
+    test('wirft bei diagonal nicht zusammenhängenden Steinen (keine Kantenverbindung)', () {
       final board = Board();
       final placements = [
         _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
@@ -251,11 +251,62 @@ void main() {
           isA<InvalidMoveException>().having(
             (e) => e.reason,
             'reason',
-            InvalidMoveReason.notInLine,
+            InvalidMoveReason.gapInLine,
           ),
         ),
       );
     });
+
+    test(
+      'Hausregel: neue Steine dürfen in einem Zug die Richtung wechseln (T-/L-Form), solange sie zusammenhängen',
+      () {
+        final board = Board();
+        board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
+        // (1,0) verlängert die Reihe horizontal, (0,1) hängt sich vertikal
+        // an denselben vorhandenen Stein an - beide neuen Steine berühren
+        // sich nicht direkt, sind aber über den vorhandenen Stein verbunden.
+        final placements = [
+          _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
+          _p(0, 1, const Tile(TileColor.red, TileShape.star)),
+        ];
+        final score = board.scorePlacement(placements);
+        // Horizontale Reihe (0,0)+(1,0): 2, vertikale Reihe (0,0)+(0,1): 2.
+        expect(score, 4);
+        board.apply(placements);
+        expect(
+          board.tileAt(const Position(1, 0)),
+          const Tile(TileColor.red, TileShape.cross),
+        );
+        expect(
+          board.tileAt(const Position(0, 1)),
+          const Tile(TileColor.red, TileShape.star),
+        );
+      },
+    );
+
+    test(
+      'Hausregel: Lücke zwischen den neuen Steinen bleibt auch bei Richtungswechsel ungültig',
+      () {
+        final board = Board();
+        board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
+        // (2,0) und (0,2) hängen jeweils NICHT direkt am vorhandenen Stein
+        // (0,0) - dazwischen liegt eine Lücke ((1,0) bzw. (0,1) sind leer).
+        final placements = [
+          _p(2, 0, const Tile(TileColor.red, TileShape.cross)),
+          _p(0, 2, const Tile(TileColor.red, TileShape.star)),
+        ];
+        expect(
+          () => board.scorePlacement(placements),
+          throwsA(
+            isA<InvalidMoveException>().having(
+              (e) => e.reason,
+              'reason',
+              InvalidMoveReason.gapInLine,
+            ),
+          ),
+        );
+      },
+    );
 
     test(
       'Mehrfachplatzierung: jeder neue Stein wertet zusätzlich seine eigene Querreihe',

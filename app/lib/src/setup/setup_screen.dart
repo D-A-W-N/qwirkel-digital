@@ -113,6 +113,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
               Text('Jeder Zug bringt Punkte, wenn die Reihen logisch aufgebaut sind.'),
               SizedBox(height: 8),
               Text('Wenn du unsicher bist, probiere zuerst einfache Reihen mit gleichen Farben oder Formen.'),
+              SizedBox(height: 8),
+              Text(
+                'Hausregel: Innerhalb eines Zugs dürfen deine neuen Steine auch die Richtung wechseln (z. B. eine T- oder L-Form bilden) – sie müssen dabei aber lückenlos zusammenhängen.',
+              ),
             ],
           ),
         ),
