@@ -1,14 +1,12 @@
 name: qwirkle_core
-description: A starting point for Dart libraries or applications.
+description: Rules engine, scoring, and bot AI for Qwirkle Digital.
 version: 1.0.0
 # repository: https://github.com/my_org/my_repo
 
 environment:
   sdk: ^3.12.2
 
-# Add regular dependencies here.
-dependencies:
-  # path: ^1.9.0
+dependencies: {}
 
 dev_dependencies:
   lints: ^6.0.0

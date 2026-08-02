@@ -49,3 +49,7 @@ jobs:
       - name: Test core package
         working-directory: packages/qwirkle_core
         run: dart test
+
+      - name: Test net package
+        working-directory: packages/qwirkle_net
+        run: dart test
