@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
@@ -7,20 +8,25 @@ import '../game/game_providers.dart';
 import '../game/game_screen.dart';
 import '../net/network_lobby_screen.dart';
 import '../settings/app_settings.dart';
+import '../update/update_controller.dart';
+import '../update/update_dialog.dart';
+import '../update/update_models.dart';
+import '../update/update_settings_section.dart';
 
 /// Spiel-Setup für den lokalen Pass&Play-Modus: Spieleranzahl (2-6) und Namen.
-class SetupScreen extends StatefulWidget {
+class SetupScreen extends ConsumerStatefulWidget {
   const SetupScreen({super.key});
 
   @override
-  State<SetupScreen> createState() => _SetupScreenState();
+  ConsumerState<SetupScreen> createState() => _SetupScreenState();
 }
 
-class _SetupScreenState extends State<SetupScreen> {
+class _SetupScreenState extends ConsumerState<SetupScreen> {
   static const minPlayers = 2;
   static const maxPlayers = 6;
 
   int _playerCount = 2;
+  bool _updateCheckTriggered = false;
   late final List<TextEditingController> _nameControllers;
   late final List<BotDifficulty?> _botDifficulties;
 
@@ -32,6 +38,26 @@ class _SetupScreenState extends State<SetupScreen> {
       (i) => TextEditingController(text: 'Spieler ${i + 1}'),
     );
     _botDifficulties = List.generate(maxPlayers, (_) => null);
+  }
+
+  /// Cleans up a stale post-update backup (proof this process is a
+  /// successfully-booted relaunch) and, if due, runs a silent throttled
+  /// update check. Inert outside release builds and unsupported platforms.
+  Future<void> _runStartupUpdateFlow() async {
+    if (!kReleaseMode) return;
+    if (currentTargetPlatform() == UpdateTargetPlatform.unsupported) return;
+
+    await ref.read(updateApplierProvider).cleanupStaleBackup();
+
+    if (!ref.read(appSettingsProvider).updateCheckEnabled) return;
+
+    final lastChecked = await ref.read(updatePrefsProvider).lastCheckedAt();
+    if (lastChecked != null &&
+        DateTime.now().difference(lastChecked) < const Duration(hours: 24)) {
+      return;
+    }
+
+    await ref.read(updateControllerProvider.notifier).checkForUpdate();
   }
 
   @override
@@ -138,6 +164,8 @@ class _SetupScreenState extends State<SetupScreen> {
                     subtitle: const Text('Zeigt kurze Tipps im Spiel und in der Lobby.'),
                   ),
                   const SizedBox(height: 12),
+                  const UpdateSettingsSection(),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -184,6 +212,18 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_updateCheckTriggered) {
+      _updateCheckTriggered = true;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _runStartupUpdateFlow(),
+      );
+    }
+    ref.listen<UpdateState>(updateControllerProvider, (previous, next) {
+      if (next.phase == UpdatePhase.available) {
+        maybeShowUpdateDialog(context, ref, manual: false);
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: const Text('Qwirkle · Spielmodus')),
       body: Padding(
