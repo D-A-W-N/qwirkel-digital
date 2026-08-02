@@ -20,7 +20,7 @@ void main() {
           ownHand: hand,
           canInteract: true,
           statusText: 'Spiel wird synchronisiert',
-          onSendMove: (placements) async {},
+          onSendMove: (placements) async => true,
         ),
       ),
     );
@@ -47,7 +47,7 @@ void main() {
           snapshot: snapshot,
           ownHand: hand,
           canInteract: false,
-          onSendMove: (placements) async {},
+          onSendMove: (placements) async => true,
         ),
       ),
     );
@@ -71,7 +71,7 @@ void main() {
           snapshot: snapshot,
           ownHand: hand,
           canInteract: true,
-          onSendMove: (placements) async {},
+          onSendMove: (placements) async => true,
         ),
       ),
     );
@@ -106,6 +106,7 @@ void main() {
           onSendMove: (placements) async {
             sentMoves += 1;
             expect(placements, isNotEmpty);
+            return true;
           },
         ),
       ),
