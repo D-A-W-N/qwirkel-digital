@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Qwirkle Digital
+Comment=Play Qwirkle locally or with friends
+Exec=qwirkle_digital
+Icon=qwirkle_icon
+Terminal=false
+Categories=Game;BoardGame;
+StartupWMClass=qwirkle_digital

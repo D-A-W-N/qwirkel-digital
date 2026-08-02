@@ -38,6 +38,9 @@ class HostSession {
 
   final _lobbyController = StreamController<LobbyMessage>.broadcast();
   final _stateController = StreamController<void>.broadcast();
+  final _gameStartedController = StreamController<bool>.broadcast();
+  final _statusController = StreamController<String>.broadcast();
+  final _errorController = StreamController<String>.broadcast();
 
   HostSession({required this.hostPlayerName});
 
@@ -49,6 +52,15 @@ class HostSession {
   /// Zug eines Clients) - für die Host-seitige UI.
   Stream<void> get onStateChanged => _stateController.stream;
 
+  /// Feuert, sobald die Partie gestartet wurde.
+  Stream<bool> get onGameStarted => _gameStartedController.stream;
+
+  /// Verfügbare Statusmeldungen für die UI.
+  Stream<String> get statusUpdates => _statusController.stream;
+
+  /// Fehler aus der Sitzungsschicht.
+  Stream<String> get errors => _errorController.stream;
+
   /// Aktuelle Warteliste (Host + beigetretene Clients) vor Spielstart.
   List<({String id, String name})> get lobbyPlayers => [
     (id: 'host', name: hostPlayerName),
@@ -58,8 +70,15 @@ class HostSession {
   /// Startet den TCP-Listener. `port: 0` lässt das Betriebssystem einen
   /// freien Port wählen (u. a. praktisch für Tests).
   Future<void> start({String address = '0.0.0.0', int port = 0}) async {
-    _serverSocket = await ServerSocket.bind(address, port);
-    _serverSocket!.listen((socket) => acceptTransport(TcpTransport(socket)));
+    try {
+      _serverSocket = await ServerSocket.bind(address, port);
+      _serverSocket!.listen((socket) => acceptTransport(TcpTransport(socket)));
+      _statusController.add('Host lauscht auf Port ${_serverSocket!.port}');
+    } on SocketException catch (error) {
+      _errorController.add('Host konnte nicht gestartet werden: ${error.message}');
+      _statusController.add('Host konnte nicht gestartet werden');
+      rethrow;
+    }
   }
 
   /// Schließt einen beliebigen [MessageTransport] als neuen Peer an (z. B.
@@ -70,6 +89,7 @@ class HostSession {
       'p${_nextClientNumber++}',
       'Spieler',
     );
+    _statusController.add('Neuer Spieler verbunden');
     _clients.add(client);
     client.subscription = transport.lines.listen(
       (line) => _handleLine(client, line),
@@ -80,13 +100,27 @@ class HostSession {
 
   void _handleDisconnect(_ConnectedClient client) {
     _clients.remove(client);
-    if (_game == null) _broadcastLobby();
+    _statusController.add('${client.name} hat die Sitzung verlassen');
+    if (_game == null) {
+      _broadcastLobby();
+    } else {
+      _broadcastState();
+    }
   }
 
   void _handleLine(_ConnectedClient client, String line) {
     final message = decodeMessage(line);
     if (message is JoinMessage) {
       client.name = message.name;
+      _statusController.add('${client.name} ist der Lobby beigetreten');
+      if (_game != null) {
+        client.playerIndex = _clients.length;
+        client.send(
+          GameStateMessage(
+            GameStateSnapshot.forRecipient(_game!, client.playerIndex!),
+          ),
+        );
+      }
       client.send(WelcomeMessage(client.playerId));
       _broadcastLobby();
       return;
@@ -99,23 +133,30 @@ class HostSession {
       if (message is MoveMessage) {
         _requireCurrentPlayer(client);
         game.playTiles(message.placements);
+        _statusController.add('${client.name} hat einen Zug gespielt');
       } else if (message is ExchangeMessage) {
         _requireCurrentPlayer(client);
         game.exchangeTiles(message.tiles);
+        _statusController.add('${client.name} hat Steine getauscht');
       } else if (message is PassMessage) {
         _requireCurrentPlayer(client);
         game.passTurn();
+        _statusController.add('${client.name} hat den Zug übergangen');
       } else {
         return;
       }
       _broadcastState();
       _stateController.add(null);
     } on InvalidMoveException catch (e) {
+      _errorController.add(e.message);
       client.send(ErrorMessage(e.message));
     } on StateError catch (e) {
+      _errorController.add(e.message);
       client.send(ErrorMessage(e.message));
     } on ArgumentError catch (e) {
-      client.send(ErrorMessage(e.message.toString()));
+      final messageText = e.message.toString();
+      _errorController.add(messageText);
+      client.send(ErrorMessage(messageText));
     }
   }
 
@@ -152,6 +193,8 @@ class HostSession {
     }
     _broadcastState();
     _stateController.add(null);
+    _gameStartedController.add(true);
+    _statusController.add('Die Partie hat begonnen');
     return game;
   }
 
@@ -172,6 +215,28 @@ class HostSession {
     _broadcastState();
     _stateController.add(null);
     return score;
+  }
+
+  /// Startet eine neue Partie neu mit denselben Teilnehmern und verteilt den
+  /// frischen Zustand an alle Clients.
+  void restartGame() {
+    if (_game == null) {
+      startGame();
+      return;
+    }
+
+    final players = [
+      Player(id: 'host', name: hostPlayerName),
+      for (final c in _clients) Player(id: c.playerId, name: c.name),
+    ];
+    _game = QwirkleGame(players: players);
+    for (var i = 0; i < _clients.length; i++) {
+      _clients[i].playerIndex = i + 1;
+    }
+    _broadcastState();
+    _stateController.add(null);
+    _gameStartedController.add(true);
+    _statusController.add('Neue Partie gestartet');
   }
 
   void exchangeHostTiles(List<Tile> tiles) {
@@ -202,5 +267,8 @@ class HostSession {
     await _serverSocket?.close();
     await _lobbyController.close();
     await _stateController.close();
+    await _gameStartedController.close();
+    await _statusController.close();
+    await _errorController.close();
   }
 }

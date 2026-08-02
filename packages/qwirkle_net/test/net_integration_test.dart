@@ -34,8 +34,8 @@ void main() {
       final client = ClientSession();
       addTearDown(client.close);
 
-      await client.connect('127.0.0.1', host.port, name: 'Ben');
       final stateFuture = client.stateUpdates.first;
+      await client.connect('127.0.0.1', host.port, name: 'Ben');
 
       final game = host.startGame();
       final snapshot = await stateFuture;
@@ -49,6 +49,19 @@ void main() {
       expect(snapshot.players[0].hand, isNull);
       expect(snapshot.players[0].handCount, 6);
       expect(game.players.length, 2);
+    });
+
+    test('Der letzte Snapshot bleibt für neue Listener verfügbar', () async {
+      final client = ClientSession();
+      addTearDown(client.close);
+
+      await client.connect('127.0.0.1', host.port, name: 'Ben');
+      host.startGame();
+
+      final snapshot = await client.stateUpdates.first;
+      expect(snapshot.yourPlayerIndex, 1);
+      expect(client.latestSnapshot, isNotNull);
+      expect(client.latestSnapshot!.players[1].hand, isNotNull);
     });
 
     test(
@@ -108,5 +121,24 @@ void main() {
         expect(game.board.isEmpty, isTrue);
       },
     );
+
+    test('Host kann eine Partie neu starten und der Client bekommt einen neuen Snapshot', () async {
+      final client = ClientSession();
+      addTearDown(client.close);
+
+      await client.connect('127.0.0.1', host.port, name: 'Ben');
+      final firstState = client.stateUpdates.first;
+      host.startGame();
+      await firstState;
+
+      final restartedSnapshotFuture = client.stateUpdates.first;
+      host.restartGame();
+      final restartedSnapshot = await restartedSnapshotFuture;
+
+      expect(restartedSnapshot.yourPlayerIndex, 1);
+      expect(restartedSnapshot.players.length, 2);
+      expect(restartedSnapshot.isOver, isFalse);
+      expect(restartedSnapshot.board.isEmpty, isTrue);
+    });
   });
 }

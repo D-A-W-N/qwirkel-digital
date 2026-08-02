@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'src/settings/app_settings.dart';
 import 'src/setup/setup_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: QwirkleApp()));
 }
 
-class QwirkleApp extends StatelessWidget {
+class QwirkleApp extends ConsumerWidget {
   const QwirkleApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await initializeAppSettings(ref);
+    });
+
     return MaterialApp(
-      title: 'Qwirkle',
+      title: 'Qwirkle Digital',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,

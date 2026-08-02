@@ -23,7 +23,11 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>$(PRODUCT_COPYRIGHT)</string>
+	<string>Copyright © 2026 Qwirkle Digital</string>
+	<key>CFBundleDisplayName</key>
+	<string>Qwirkle Digital</string>
+	<key>NSPrivacyAccessedAPICategory</key>
+	<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 
+import '../settings/app_settings.dart';
 import 'game_controller.dart';
 import 'game_providers.dart';
 import 'widgets/board_view.dart';
@@ -31,6 +32,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = ref.watch(gameControllerProvider);
+    final settings = ref.watch(appSettingsProvider);
     final game = controller.game;
 
     if (game.isOver && !_gameOverShown) {
@@ -45,7 +47,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Qwirkle · Beutel: ${game.bag.remaining}'),
-        bottom: controller.isCurrentPlayerBot && !game.isOver
+        bottom: controller.isCurrentPlayerBot && !game.isOver && settings.animationsEnabled
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(28),
                 child: Padding(

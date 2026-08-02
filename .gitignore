@@ -3,11 +3,24 @@
 
 # IDE
 .idea/
+.vscode/
 *.iml
 
-# Dart/Flutter (pro Package/App vorhanden, hier nur als Fallback)
+# Dart/Flutter
 .dart_tool/
 .packages
 build/
 .pub-cache/
 .pub/
+
+# Local environment / generated files
+.env
+*.log
+
+# Flutter desktop build artifacts
+app/build/
+app/.dart_tool/
+
+# Python virtual environments
+.venv/
+venv/
