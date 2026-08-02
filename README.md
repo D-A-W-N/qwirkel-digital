@@ -79,6 +79,14 @@ Die genaue Arbeitsweise ist in [docs/branching/README.md](docs/branching/README.
 - [ ] Linux- und Windows-Release auf echten Hosts verifizieren
 - [ ] Installer/Package-Workflow für Distribution definieren
 
+## Installation (fertige Builds)
+
+Fertige Builds für macOS, Linux und Windows gibt es unter [GitHub Releases](https://github.com/D-A-W-N/qwirkel-digital/releases) — jeweils als Zip/Tar.gz, kein Installer.
+
+- **macOS**: Die App ist nicht signiert/notarisiert. Beim ersten Start blockiert Gatekeeper sie als "nicht verifizierter Entwickler" — über Rechtsklick → Öffnen (oder Systemeinstellungen → Datenschutz & Sicherheit) trotzdem starten.
+- **Linux/Windows**: Archiv entpacken, ausführbare Datei starten.
+- **Updates**: Auf macOS und Linux prüft die App selbst auf neue Versionen und kann sich per Klick aktualisieren (Einstellungen → "Nach Updates suchen"). Für Windows gibt es das nicht — dort müssen neue Releases manuell heruntergeladen werden.
+
 ## Beitragen
 
 1. Fork erstellen
@@ -88,4 +96,4 @@ Die genaue Arbeitsweise ist in [docs/branching/README.md](docs/branching/README.
 
 ## Lizenz
 
-Das Projekt ist aktuell für den privaten und frühen Release-Use vorbereitet. Eine endgültige Open-Source- oder kommerzielle Lizenz kann im Repository-Setup noch festgelegt werden.
+MIT, siehe [LICENSE](LICENSE).

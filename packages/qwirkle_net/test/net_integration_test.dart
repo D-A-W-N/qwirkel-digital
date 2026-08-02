@@ -140,5 +140,46 @@ void main() {
       expect(restartedSnapshot.isOver, isFalse);
       expect(restartedSnapshot.board.isEmpty, isTrue);
     });
+
+    test(
+      'Client erfährt vom Verbindungsabbruch, wenn der Host schließt',
+      () async {
+        final client = ClientSession();
+        addTearDown(client.close);
+        await client.connect('127.0.0.1', host.port, name: 'Ben');
+
+        final errorFuture = client.errors.first;
+        await host.close();
+        final error = await errorFuture;
+
+        expect(error, contains('verloren'));
+      },
+    );
+
+    test(
+      'Host überspringt automatisch den Zug eines getrennten Clients',
+      () async {
+        final client = ClientSession();
+        addTearDown(client.close);
+
+        final firstState = client.stateUpdates.first;
+        await client.connect('127.0.0.1', host.port, name: 'Ben');
+        final game = host.startGame();
+        await firstState;
+
+        game.currentPlayerIndex = 1; // Client ist am Zug.
+
+        final statusFuture = host.statusUpdates.firstWhere(
+          (s) => s.contains('getrennt'),
+        );
+        await client.close();
+        await statusFuture;
+
+        // Bei nur 2 Spielern springt der übersprungene Zug direkt zurück
+        // zum Host (Index 0) - die Partie hängt nicht am getrennten Client.
+        expect(game.currentPlayerIndex, 0);
+        expect(game.isOver, isFalse);
+      },
+    );
   });
 }

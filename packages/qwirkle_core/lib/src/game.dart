@@ -14,6 +14,12 @@ class QwirkleGame {
   late int currentPlayerIndex;
   bool isOver = false;
 
+  /// Zählt aufeinanderfolgende [passTurn]-Aufrufe ohne dazwischenliegenden
+  /// Zug/Tausch. Erreicht er [players.length] (jede:r hat in Folge gepasst),
+  /// endet die Partie — verhindert ein Hängenbleiben, wenn bei leerem Beutel
+  /// niemand mehr etwas Sinnvolles tun kann.
+  int _consecutivePasses = 0;
+
   QwirkleGame({
     required this.players,
     TileBag? bag,
@@ -45,6 +51,7 @@ class QwirkleGame {
       _removeOneFromHand(player, placement.tile);
     }
     player.hand.addAll(bag.draw(placements.length));
+    _consecutivePasses = 0;
 
     if (player.hand.isEmpty && bag.isEmpty) {
       points += 6;
@@ -75,13 +82,19 @@ class QwirkleGame {
     }
     player.hand.addAll(drawn);
     bag.returnTiles(tiles);
+    _consecutivePasses = 0;
     _advanceTurn();
   }
 
   /// Wechselt zum nächsten Spieler ohne Aktion (z. B. wenn kein gültiger Zug
-  /// möglich ist).
+  /// möglich ist). Passt jede:r Spieler:in in Folge einmal, ohne dass
+  /// dazwischen gezogen oder getauscht wurde, endet die Partie.
   void passTurn() {
     if (isOver) throw StateError('Das Spiel ist bereits beendet.');
+    _consecutivePasses++;
+    if (_consecutivePasses >= players.length) {
+      isOver = true;
+    }
     _advanceTurn();
   }
 

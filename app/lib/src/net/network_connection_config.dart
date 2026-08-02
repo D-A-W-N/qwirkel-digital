@@ -1,6 +1,7 @@
 class NetworkConnectionConfig {
   NetworkConnectionConfig({
     required String mode,
+    required this.isHosting,
     required String host,
     required String port,
     required String name,
@@ -19,6 +20,11 @@ class NetworkConnectionConfig {
   }
 
   final String mode;
+
+  /// Ob diese Session ein Spiel hosten oder einem bestehenden beitreten
+  /// soll — unabhängig von [mode] (LAN/Internet), da beide Verbindungsarten
+  /// sowohl Host- als auch Beitritts-Rolle unterstützen.
+  final bool isHosting;
   final String host;
   final String port;
   final String name;
