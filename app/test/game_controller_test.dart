@@ -100,6 +100,7 @@ void main() {
       );
       final human = Player(id: 'h', name: 'Ben');
       final game = QwirkleGame(players: [bot, human]);
+      game.currentPlayerIndex = 0; // Bot ist dran (Starthand entscheidet sonst zufällig).
       final controller = GameController(game);
 
       expect(controller.lastBotSummary, isNull);
