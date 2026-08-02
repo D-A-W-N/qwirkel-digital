@@ -72,11 +72,17 @@ class LinuxUpdateApplier implements UpdateApplier {
 
   @override
   Future<void> cleanupStaleBackup() async {
-    final backup = Directory(_backupPath);
+    // Called unconditionally at startup, independent of prepare() — must
+    // locate the bundle itself rather than rely on _bundleDir, which is
+    // only set once prepare() has actually run in this process.
+    final bundleDir = p.dirname(Platform.resolvedExecutable);
+    final backup = Directory('$bundleDir.bak');
     if (await backup.exists()) {
       await backup.delete(recursive: true);
     }
-    final extractDir = Directory(_extractDirPath);
+    final extractDir = Directory(
+      p.join(p.dirname(bundleDir), '.qwirkle-update-extract'),
+    );
     if (await extractDir.exists()) {
       await extractDir.delete(recursive: true);
     }
