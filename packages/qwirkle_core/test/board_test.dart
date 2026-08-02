@@ -207,6 +207,76 @@ void main() {
       );
     });
 
+    test('wirft bei leerer Platzierung', () {
+      final board = Board();
+      expect(
+        () => board.scorePlacement([]),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.emptyPlacement,
+          ),
+        ),
+      );
+    });
+
+    test('wirft bei doppelt belegtem Feld im selben Zug', () {
+      final board = Board();
+      final placements = [
+        _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
+        _p(0, 0, const Tile(TileColor.red, TileShape.cross)),
+      ];
+      expect(
+        () => board.scorePlacement(placements),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.duplicatePosition,
+          ),
+        ),
+      );
+    });
+
+    test('wirft, wenn die Steine weder in einer Reihe noch einer Spalte liegen', () {
+      final board = Board();
+      final placements = [
+        _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
+        _p(1, 1, const Tile(TileColor.red, TileShape.cross)),
+      ];
+      expect(
+        () => board.scorePlacement(placements),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.notInLine,
+          ),
+        ),
+      );
+    });
+
+    test(
+      'Mehrfachplatzierung: jeder neue Stein wertet zusätzlich seine eigene Querreihe',
+      () {
+        final board = Board();
+        board.apply([
+          _p(0, -1, const Tile(TileColor.orange, TileShape.circle)),
+          _p(1, -1, const Tile(TileColor.orange, TileShape.cross)),
+        ]);
+        final placements = [
+          _p(0, 0, const Tile(TileColor.orange, TileShape.star)),
+          _p(1, 0, const Tile(TileColor.orange, TileShape.diamond)),
+        ];
+        final score = board.scorePlacement(placements);
+        // Hauptreihe horizontal (0,0)-(1,0): 2
+        // + Querreihe bei x=0 ((0,-1)+(0,0)): 2
+        // + Querreihe bei x=1 ((1,-1)+(1,0)): 2
+        expect(score, 6);
+      },
+    );
+
     test('wirft bei belegtem Feld', () {
       final board = Board();
       board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
