@@ -54,6 +54,17 @@ class _Candidate {
   const _Candidate(this.placements, this.score);
 }
 
+/// Eine gerade Reihe (Teil-)Kandidat samt ihrer Richtung, damit sie als
+/// Basis für einen rechtwinkligen Abzweig (T-/L-Form) dienen kann.
+class _LineCandidate {
+  final List<TilePlacement> placements;
+  final int dx;
+  final int dy;
+  final int score;
+
+  const _LineCandidate(this.placements, this.dx, this.dy, this.score);
+}
+
 const _directions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
 /// Ermittelt für [game] den Zug der aktuellen Spielerin gemäß [difficulty].
@@ -170,6 +181,7 @@ class Bot {
         }
       }
       for (final direction in _directions) {
+        final lineCandidates = <_LineCandidate>[];
         _extendLine(
           board,
           List<Tile>.from(hand),
@@ -177,8 +189,15 @@ class Bot {
           direction.$1,
           direction.$2,
           const [],
-          candidates,
+          lineCandidates,
         );
+        for (final line in lineCandidates) {
+          // Einzelsteinkandidaten wurden bereits separat erzeugt.
+          if (line.placements.length > 1) {
+            candidates.add(_Candidate(line.placements, line.score));
+          }
+          _addPerpendicularBranches(board, hand, line, candidates);
+        }
       }
     }
     return candidates;
@@ -191,7 +210,7 @@ class Bot {
     int dx,
     int dy,
     List<TilePlacement> current,
-    List<_Candidate> results,
+    List<_LineCandidate> results,
   ) {
     final triedTiles = <Tile>{};
     for (var i = 0; i < remainingHand.length; i++) {
@@ -202,15 +221,58 @@ class Bot {
       final score = _tryScore(board, trial);
       if (score == null) continue;
 
-      // Einzelsteinkandidaten wurden bereits separat erzeugt.
-      if (trial.length > 1) {
-        results.add(_Candidate(trial, score));
-      }
+      results.add(_LineCandidate(trial, dx, dy, score));
 
       final nextPosition = Position(position.x + dx, position.y + dy);
       if (board.tileAt(nextPosition) == null) {
         final nextHand = List<Tile>.from(remainingHand)..removeAt(i);
         _extendLine(board, nextHand, nextPosition, dx, dy, trial, results);
+      }
+    }
+  }
+
+  /// Verzweigt von jedem Stein einer geraden Reihe [line] rechtwinklig ab
+  /// und erzeugt so T-/L-förmige Zugkandidaten (Richtungswechsel innerhalb
+  /// eines Zugs, siehe Hausregel in [Board.scorePlacement]). Es wird
+  /// bewusst nur ein einzelner Abzweig pro Reihe versucht (kein weiteres
+  /// Verzweigen des Abzweigs), um die Suche begrenzt zu halten.
+  void _addPerpendicularBranches(
+    Board board,
+    List<Tile> hand,
+    _LineCandidate line,
+    List<_Candidate> candidates,
+  ) {
+    final remainingHand = List<Tile>.from(hand);
+    for (final placement in line.placements) {
+      remainingHand.remove(placement.tile);
+    }
+    if (remainingHand.isEmpty) return;
+
+    final perpendicular = line.dx != 0
+        ? const [(0, 1), (0, -1)]
+        : const [(1, 0), (-1, 0)];
+
+    for (final placement in line.placements) {
+      for (final direction in perpendicular) {
+        final branchStart = Position(
+          placement.position.x + direction.$1,
+          placement.position.y + direction.$2,
+        );
+        if (board.tileAt(branchStart) != null) continue;
+
+        final branches = <_LineCandidate>[];
+        _extendLine(
+          board,
+          List<Tile>.from(remainingHand),
+          branchStart,
+          direction.$1,
+          direction.$2,
+          line.placements,
+          branches,
+        );
+        for (final branch in branches) {
+          candidates.add(_Candidate(branch.placements, branch.score));
+        }
       }
     }
   }
