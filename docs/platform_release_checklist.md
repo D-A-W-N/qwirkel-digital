@@ -3,7 +3,7 @@
 ## Allgemein
 
 - [x] App auf macOS, Linux und Windows buildbar (`.github/workflows/desktop-build.yml`, alle drei Plattformen bei jedem Tag-Release)
-- [ ] Tests laufen auf allen drei Ziel-Betriebssystemen selbst — CI führt `flutter test`/`dart test` aktuell nur auf einem Linux-Runner aus (`ci.yml`), nicht zusätzlich auf macOS-/Windows-Runnern
+- [x] Tests laufen auf allen drei Ziel-Betriebssystemen selbst — `ci.yml` läuft als Matrix-Build auf `ubuntu-latest`, `macos-latest` und `windows-latest`
 - [x] Offizielle Build- und Startbefehle dokumentiert (Root-[README.md](../README.md))
 - [x] Versionierung und Build-Nummer konsistent (`pubspec.yaml`-`version:` und Git-Tag `vX.Y.Z` seit v0.3.0 synchron gehalten)
 
