@@ -6,7 +6,9 @@ import 'package:qwirkle_digital/src/settings/app_settings.dart';
 
 void main() {
   testWidgets('SetupScreen zeigt die Anleitung im Dialog an', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SetupScreen()));
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: SetupScreen())),
+    );
 
     await tester.tap(find.text('Anleitung'));
     await tester.pumpAndSettle();
@@ -21,6 +23,7 @@ void main() {
 
     expect(container.read(appSettingsProvider).animationsEnabled, isTrue);
     expect(container.read(appSettingsProvider).tipsEnabled, isTrue);
+    expect(container.read(appSettingsProvider).updateCheckEnabled, isTrue);
 
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
@@ -28,10 +31,14 @@ void main() {
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
         .copyWith(tipsEnabled: false);
+    container.read(appSettingsProvider.notifier).state = container
+        .read(appSettingsProvider)
+        .copyWith(updateCheckEnabled: false);
 
     final settings = container.read(appSettingsProvider);
     expect(settings.animationsEnabled, isFalse);
     expect(settings.tipsEnabled, isFalse);
+    expect(settings.updateCheckEnabled, isFalse);
   });
 
   test('App-Settings können auf Standardwerte zurückgesetzt werden', () async {
@@ -40,7 +47,11 @@ void main() {
 
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
-        .copyWith(animationsEnabled: false, tipsEnabled: false);
+        .copyWith(
+          animationsEnabled: false,
+          tipsEnabled: false,
+          updateCheckEnabled: false,
+        );
 
     try {
       await resetAppSettings(
@@ -50,11 +61,13 @@ void main() {
       final settings = container.read(appSettingsProvider);
       expect(settings.animationsEnabled, isTrue);
       expect(settings.tipsEnabled, isTrue);
+      expect(settings.updateCheckEnabled, isTrue);
       return;
     }
 
     final settings = container.read(appSettingsProvider);
     expect(settings.animationsEnabled, isTrue);
     expect(settings.tipsEnabled, isTrue);
+    expect(settings.updateCheckEnabled, isTrue);
   });
 }

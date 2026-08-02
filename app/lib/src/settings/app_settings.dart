@@ -6,20 +6,31 @@ class AppSettings {
   const AppSettings({
     required this.animationsEnabled,
     required this.tipsEnabled,
+    required this.updateCheckEnabled,
   });
 
   final bool animationsEnabled;
   final bool tipsEnabled;
+  final bool updateCheckEnabled;
 
-  AppSettings copyWith({bool? animationsEnabled, bool? tipsEnabled}) {
+  AppSettings copyWith({
+    bool? animationsEnabled,
+    bool? tipsEnabled,
+    bool? updateCheckEnabled,
+  }) {
     return AppSettings(
       animationsEnabled: animationsEnabled ?? this.animationsEnabled,
       tipsEnabled: tipsEnabled ?? this.tipsEnabled,
+      updateCheckEnabled: updateCheckEnabled ?? this.updateCheckEnabled,
     );
   }
 
   static AppSettings defaults() {
-    return const AppSettings(animationsEnabled: true, tipsEnabled: true);
+    return const AppSettings(
+      animationsEnabled: true,
+      tipsEnabled: true,
+      updateCheckEnabled: true,
+    );
   }
 }
 
@@ -32,9 +43,12 @@ Future<void> initializeAppSettings(WidgetRef ref) async {
   final settings = AppSettings(
     animationsEnabled: prefs.getBool('animationsEnabled') ?? true,
     tipsEnabled: prefs.getBool('tipsEnabled') ?? true,
+    updateCheckEnabled: prefs.getBool('updateCheckEnabled') ?? true,
   );
-  if (ref.read(appSettingsProvider).animationsEnabled != settings.animationsEnabled ||
-      ref.read(appSettingsProvider).tipsEnabled != settings.tipsEnabled) {
+  final current = ref.read(appSettingsProvider);
+  if (current.animationsEnabled != settings.animationsEnabled ||
+      current.tipsEnabled != settings.tipsEnabled ||
+      current.updateCheckEnabled != settings.updateCheckEnabled) {
     ref.read(appSettingsProvider.notifier).state = settings;
   }
 }
@@ -43,6 +57,7 @@ Future<void> saveAppSettings(AppSettings settings) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool('animationsEnabled', settings.animationsEnabled);
   await prefs.setBool('tipsEnabled', settings.tipsEnabled);
+  await prefs.setBool('updateCheckEnabled', settings.updateCheckEnabled);
 }
 
 Future<void> resetAppSettings(dynamic ref) async {
