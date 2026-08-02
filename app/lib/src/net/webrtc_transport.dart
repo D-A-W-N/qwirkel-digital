@@ -63,15 +63,27 @@ const _defaultIceServers = {
 class WebRtcConnection {
   final SignalingClient signaling;
   final String remotePeerId;
+
+  /// ICE-Server-Konfiguration für den Verbindungsaufbau. Standard ist
+  /// STUN-only ([_defaultIceServers]); ein TURN-Server (nötig für
+  /// zuverlässige Verbindungen hinter symmetrischem NAT) kann hier
+  /// übergeben werden, sobald einer verfügbar ist - ohne Änderungen an der
+  /// restlichen Verbindungslogik.
+  final Map<String, dynamic> iceServers;
+
   RTCPeerConnection? _peerConnection;
   StreamSubscription? _iceSub;
 
-  WebRtcConnection({required this.signaling, required this.remotePeerId});
+  WebRtcConnection({
+    required this.signaling,
+    required this.remotePeerId,
+    this.iceServers = _defaultIceServers,
+  });
 
   /// Host-Seite: erstellt den DataChannel aktiv, sendet das Offer und
   /// wartet auf Answer + Öffnen des Kanals.
   Future<WebRtcTransport> connectAsOfferer() async {
-    final pc = await createPeerConnection(_defaultIceServers);
+    final pc = await createPeerConnection(iceServers);
     _peerConnection = pc;
     _wireIceCandidates(pc);
 
@@ -98,7 +110,7 @@ class WebRtcConnection {
   /// Gast-Seite: wartet auf das eingehende Offer des Hosts, beantwortet es
   /// und wartet auf den vom Host erstellten DataChannel.
   Future<WebRtcTransport> connectAsAnswerer() async {
-    final pc = await createPeerConnection(_defaultIceServers);
+    final pc = await createPeerConnection(iceServers);
     _peerConnection = pc;
     _wireIceCandidates(pc);
 

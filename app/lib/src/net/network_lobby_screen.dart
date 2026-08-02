@@ -157,6 +157,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                 try {
                   final config = NetworkConnectionConfig(
                     mode: _connectionMode,
+                    isHosting: _isHosting,
                     host: _hostController.text,
                     port: _portController.text,
                     name: _nameController.text,
