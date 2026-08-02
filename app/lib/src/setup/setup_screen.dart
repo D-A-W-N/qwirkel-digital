@@ -47,7 +47,12 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
     if (!kReleaseMode) return;
     if (currentTargetPlatform() == UpdateTargetPlatform.unsupported) return;
 
-    await ref.read(updateApplierProvider).cleanupStaleBackup();
+    try {
+      await ref.read(updateApplierProvider).cleanupStaleBackup();
+    } catch (_) {
+      // Best-effort: a leftover backup (or a failure to locate/delete one)
+      // must never block the actual update check below.
+    }
 
     if (!ref.read(appSettingsProvider).updateCheckEnabled) return;
 
