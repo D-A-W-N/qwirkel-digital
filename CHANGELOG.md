@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-02
+
+- Fixed the silent startup update check being skippable by an unrelated failure (a stale-backup cleanup error could prevent the actual update check from ever running)
+
 ## [0.4.1] - 2026-08-02
 
 - Fixed the host not seeing players join the lobby (client saw them fine)
