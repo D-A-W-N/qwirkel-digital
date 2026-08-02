@@ -58,6 +58,18 @@ flutter build linux --release
 flutter build windows --release
 ```
 
+## Branching und Releases
+
+Für die Entwicklung gilt ein einfacher Git-Flow:
+
+- `develop` ist der Integrationszweig für alle fertig getesteten Features
+- `feature/*` wird für neue Arbeit angelegt
+- `release/*` wird für die finale Vorbereitung eines Releases genutzt
+- `main` bleibt der stabil veröffentlichbare Stand
+- Build- und Release-Artefakte werden nur bei taggierten Releases im Format `v*` erzeugt
+
+Die genaue Arbeitsweise ist in [docs/branching/README.md](docs/branching/README.md) beschrieben.
+
 ## Release-Checkliste
 
 - [x] macOS-Release-Build ist lokal vorbereitet

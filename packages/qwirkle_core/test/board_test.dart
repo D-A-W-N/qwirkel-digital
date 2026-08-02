@@ -108,6 +108,25 @@ void main() {
       );
     });
 
+    test('wirft bei einer Mehrfachplatzierung mit Lücke in der neuen Reihe', () {
+      final board = Board();
+      board.apply([_p(0, 0, const Tile(TileColor.red, TileShape.circle))]);
+      final placements = [
+        _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
+        _p(3, 0, const Tile(TileColor.red, TileShape.diamond)),
+      ];
+      expect(
+        () => board.scorePlacement(placements),
+        throwsA(
+          isA<InvalidMoveException>().having(
+            (e) => e.reason,
+            'reason',
+            InvalidMoveReason.gapInLine,
+          ),
+        ),
+      );
+    });
+
     test('wirft bei Attributkonflikt (weder Farbe noch Symbol gleich)', () {
       final board = Board();
       final placements = [
