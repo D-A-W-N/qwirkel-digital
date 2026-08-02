@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-02
+
+- Fixed every Windows in-app update failing: `Expand-Archive` refuses to process a file that doesn't literally end in `.zip`, but the downloaded update was named without one
+
 ## [0.7.0] - 2026-08-02
 
 - Show the live point value of the currently staged (unconfirmed) placement during your turn
