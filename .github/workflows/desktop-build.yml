@@ -16,7 +16,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.0"
+          flutter-version: "3.44.8"
       - name: Enable desktop targets
         run: flutter config --enable-macos-desktop --enable-linux-desktop --enable-windows-desktop
       - name: Install Linux build dependencies
