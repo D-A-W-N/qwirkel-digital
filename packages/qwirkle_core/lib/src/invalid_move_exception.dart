@@ -4,7 +4,6 @@ enum InvalidMoveReason {
   tooManyTiles,
   duplicatePosition,
   positionOccupied,
-  notInLine,
   gapInLine,
   notConnected,
   attributeMismatch,
