@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Extended the in-app self-updater to Windows (copy-and-relaunch via a detached PowerShell helper, since a running `.exe` cannot be renamed/overwritten in place)
+
 ## [0.4.2] - 2026-08-02
 
 - Fixed the silent startup update check being skippable by an unrelated failure (a stale-backup cleanup error could prevent the actual update check from ever running)

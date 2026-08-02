@@ -51,7 +51,9 @@ http.Client _clientReturningTag(String tagName, {int statusCode = 200}) {
           {"name": "qwirkle-digital-macos.zip", "browser_download_url": "https://example.invalid/macos.zip"},
           {"name": "qwirkle-digital-macos.zip.sha256", "browser_download_url": "https://example.invalid/macos.zip.sha256"},
           {"name": "qwirkle-digital-linux.tar.gz", "browser_download_url": "https://example.invalid/linux.tar.gz"},
-          {"name": "qwirkle-digital-linux.tar.gz.sha256", "browser_download_url": "https://example.invalid/linux.tar.gz.sha256"}
+          {"name": "qwirkle-digital-linux.tar.gz.sha256", "browser_download_url": "https://example.invalid/linux.tar.gz.sha256"},
+          {"name": "qwirkle-digital-windows.zip", "browser_download_url": "https://example.invalid/windows.zip"},
+          {"name": "qwirkle-digital-windows.zip.sha256", "browser_download_url": "https://example.invalid/windows.zip.sha256"}
         ]
       }
       ''',
