@@ -67,6 +67,27 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               players: game.players,
               currentIndex: game.currentPlayerIndex,
             ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              child: Row(
+                children: [
+                  Icon(
+                    _statusIcon(controller, game, _exchangeMode),
+                    size: 18,
+                    color: _statusColor(controller, game, _exchangeMode, context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusText(controller, game, _exchangeMode),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             if (controller.lastError != null)
               Container(
                 width: double.infinity,
@@ -96,6 +117,51 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ),
       ),
     );
+  }
+
+  IconData _statusIcon(
+    GameController controller,
+    QwirkleGame game,
+    bool exchangeMode,
+  ) {
+    if (game.isOver) return Icons.celebration_outlined;
+    if (controller.isCurrentPlayerBot) return Icons.smart_toy_outlined;
+    if (exchangeMode) return Icons.swap_horiz_outlined;
+    if (controller.hasPendingPlacements) return Icons.add_circle_outline;
+    return Icons.play_circle_outline;
+  }
+
+  Color _statusColor(
+    GameController controller,
+    QwirkleGame game,
+    bool exchangeMode,
+    BuildContext context,
+  ) {
+    if (controller.lastError != null) return Colors.red.shade700;
+    if (game.isOver) return Colors.green.shade700;
+    if (controller.isCurrentPlayerBot) return Colors.blue.shade700;
+    if (exchangeMode) return Colors.orange.shade700;
+    if (controller.hasPendingPlacements) return Colors.indigo.shade700;
+    return Theme.of(context).colorScheme.primary;
+  }
+
+  String _statusText(
+    GameController controller,
+    QwirkleGame game,
+    bool exchangeMode,
+  ) {
+    if (game.isOver) return 'Die Runde ist beendet.';
+    if (controller.lastError != null) return controller.lastError!;
+    if (controller.isCurrentPlayerBot) {
+      return '${game.currentPlayer.name} denkt über den nächsten Zug nach…';
+    }
+    if (exchangeMode) {
+      return 'Tauschmodus aktiv – wähle Steine aus deiner Hand aus.';
+    }
+    if (controller.hasPendingPlacements) {
+      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.';
+    }
+    return 'Wähle einen Stein aus deiner Hand und platziere ihn auf dem Brett.';
   }
 
   /// Löst den Zug einer KI-Spielerin verzögert aus (damit der Zugwechsel
