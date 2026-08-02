@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
+import '../game/widgets/tile_view.dart';
+
 class NetworkGameView extends StatefulWidget {
   const NetworkGameView({
     super.key,
@@ -88,7 +90,9 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                   return Chip(
                     avatar: active ? const Icon(Icons.play_arrow, size: 18) : null,
                     label: Text('${player.name}: ${widget.snapshot.players[index].score} ${widget.snapshot.players[index].score == 1 ? 'Punkt' : 'Punkte'}'),
-                    backgroundColor: active ? Colors.amber.shade200 : null,
+                    backgroundColor: active
+                        ? Theme.of(context).colorScheme.tertiaryContainer
+                        : null,
                   );
                 },
               ),
@@ -125,7 +129,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                           child: Text(
                             'Neue Partie gestartet',
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),
@@ -233,21 +237,10 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                           onTap: widget.canInteract
                               ? () => setState(() => _selectedHandIndex = index)
                               : null,
-                          child: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? Theme.of(context).colorScheme.primaryContainer
-                                  : const Color(0xFF222222),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                tile.toString(),
-                                style: const TextStyle(color: Colors.white, fontSize: 10),
-                              ),
-                            ),
+                          child: TileView(
+                            tile: tile,
+                            size: 42,
+                            highlighted: selected,
                           ),
                         );
                       },
@@ -419,33 +412,21 @@ class _BoardCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tile == null) {
+    final currentTile = tile;
+    if (currentTile == null) {
       return Container(
         width: 48,
         height: 48,
         margin: const EdgeInsets.all(1),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white10),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
         ),
       );
     }
 
-    return Center(
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: const Color(0xFF222222),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: Text(
-            tile!.toString(),
-            style: const TextStyle(color: Colors.white, fontSize: 10),
-          ),
-        ),
-      ),
-    );
+    return Center(child: TileView(tile: currentTile, size: 48));
   }
 }
 

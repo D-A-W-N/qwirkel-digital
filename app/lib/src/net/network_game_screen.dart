@@ -397,8 +397,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                     leading: const Icon(Icons.person),
                     title: Text(player.name),
                     trailing: _snapshot != null || _gameStarted
-                        ? const Icon(Icons.play_circle_fill, color: Colors.green)
-                        : const Icon(Icons.pending, color: Colors.orange),
+                        ? Icon(Icons.play_circle_fill, color: Colors.green.shade700)
+                        : Icon(Icons.pending, color: Colors.orange.shade700),
                   ),
                 ),
               ],

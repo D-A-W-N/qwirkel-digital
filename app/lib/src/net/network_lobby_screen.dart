@@ -139,14 +139,24 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Theme.of(context).colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red),
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(_errorText!)),
+                    Expanded(
+                      child: Text(
+                        _errorText!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
