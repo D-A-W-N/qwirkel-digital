@@ -36,6 +36,13 @@ class HostSession {
   QwirkleGame? _game;
   int _nextClientNumber = 1;
 
+  /// Spieler-Indizes, deren Transport mitten in der Partie getrennt wurde.
+  /// Kein Wiederverbinden auf denselben Sitzplatz (bräuchte Session-Tokens
+  /// und eine Rejoin-UI) — stattdessen wird ihr Zug automatisch
+  /// übersprungen, damit die Partie für die übrigen Spieler nicht hängen
+  /// bleibt.
+  final Set<int> _disconnectedPlayerIndexes = {};
+
   final _lobbyController = StreamController<LobbyMessage>.broadcast();
   final _stateController = StreamController<void>.broadcast();
   final _gameStartedController = StreamController<bool>.broadcast();
@@ -103,8 +110,30 @@ class HostSession {
     _statusController.add('${client.name} hat die Sitzung verlassen');
     if (_game == null) {
       _broadcastLobby();
-    } else {
-      _broadcastState();
+      return;
+    }
+    final index = client.playerIndex;
+    if (index != null) {
+      _disconnectedPlayerIndexes.add(index);
+      _skipDisconnectedPlayers();
+    }
+    _broadcastState();
+    _stateController.add(null);
+  }
+
+  /// Überspringt automatisch jede:n Spieler:in, deren Transport getrennt
+  /// wurde, solange sie/er am Zug ist — sonst würde die Partie für die
+  /// übrigen Spieler an dieser Stelle für immer hängen bleiben. Das neue
+  /// Deadlock-Ende in [QwirkleGame.passTurn] beendet die Partie regulär,
+  /// falls dadurch alle verbleibenden Spieler in Folge passen.
+  void _skipDisconnectedPlayers() {
+    final game = _game;
+    if (game == null) return;
+    while (!game.isOver &&
+        _disconnectedPlayerIndexes.contains(game.currentPlayerIndex)) {
+      final name = game.players[game.currentPlayerIndex].name;
+      game.passTurn();
+      _statusController.add('$name ist getrennt – Zug wird übersprungen');
     }
   }
 
@@ -145,6 +174,7 @@ class HostSession {
       } else {
         return;
       }
+      _skipDisconnectedPlayers();
       _broadcastState();
       _stateController.add(null);
     } on InvalidMoveException catch (e) {
@@ -188,6 +218,7 @@ class HostSession {
     ];
     final game = QwirkleGame(players: players);
     _game = game;
+    _disconnectedPlayerIndexes.clear();
     for (var i = 0; i < _clients.length; i++) {
       _clients[i].playerIndex = i + 1;
     }
@@ -212,6 +243,7 @@ class HostSession {
   /// Zustand an alle Clients.
   int playHostMove(List<TilePlacement> placements) {
     final score = _game!.playTiles(placements);
+    _skipDisconnectedPlayers();
     _broadcastState();
     _stateController.add(null);
     return score;
@@ -230,6 +262,7 @@ class HostSession {
       for (final c in _clients) Player(id: c.playerId, name: c.name),
     ];
     _game = QwirkleGame(players: players);
+    _disconnectedPlayerIndexes.clear();
     for (var i = 0; i < _clients.length; i++) {
       _clients[i].playerIndex = i + 1;
     }
@@ -241,12 +274,14 @@ class HostSession {
 
   void exchangeHostTiles(List<Tile> tiles) {
     _game!.exchangeTiles(tiles);
+    _skipDisconnectedPlayers();
     _broadcastState();
     _stateController.add(null);
   }
 
   void passHostTurn() {
     _game!.passTurn();
+    _skipDisconnectedPlayers();
     _broadcastState();
     _stateController.add(null);
   }
