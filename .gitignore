@@ -6,6 +6,9 @@
 .vscode/
 *.iml
 
+# KI
+.claude/
+
 # Dart/Flutter
 .dart_tool/
 .packages

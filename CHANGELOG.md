@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-02
+
+- Bot AI now also plays T-/L-shaped moves under the multi-direction house rule (previously only straight lines, even though human players could already bend a move)
+- CI now runs the full test suite on macOS, Linux, and Windows for every change, not just Linux
+
 ## [0.5.0] - 2026-08-02
 
 - Extended the in-app self-updater to Windows (copy-and-relaunch via a detached PowerShell helper, since a running `.exe` cannot be renamed/overwritten in place)
