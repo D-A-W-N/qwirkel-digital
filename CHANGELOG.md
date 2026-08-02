@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-02
+
+- Fixed the host not seeing players join the lobby (client saw them fine)
+- Fixed placed tiles getting stuck as a pending overlay and the status text getting stuck on "Host führt den Zug aus..." after a host move was rejected
+- Host now detects and displays its own reachable LAN address instead of leaving misleading `127.0.0.1` defaults in the connection fields
+
 ## [0.4.0] - 2026-08-02
 
 - Wired up internet multiplayer (WebRTC signaling/connection was fully implemented but never connected to the network screen)
