@@ -4,44 +4,105 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            name: macos
+            build_command: flutter build macos --release
+          - os: ubuntu-latest
+            name: linux
+            build_command: flutter build linux --release
+          - os: windows-latest
+            name: windows
+            build_command: flutter build windows --release
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: "3.44.8"
+
       - name: Enable desktop targets
         run: flutter config --enable-macos-desktop --enable-linux-desktop --enable-windows-desktop
+
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
       - name: Get dependencies
         working-directory: app
         run: flutter pub get
+
       - name: Analyze
         working-directory: app
         run: flutter analyze
+
       - name: Test
         working-directory: app
         run: flutter test
-      - name: Build macOS
-        if: runner.os == 'macOS'
+
+      - name: Build app
         working-directory: app
-        run: flutter build macos --release
-      - name: Build Linux
-        if: runner.os == 'Linux'
+        run: ${{ matrix.build_command }}
+
+      - name: Package artifact
         working-directory: app
-        run: flutter build linux --release
-      - name: Build Windows
-        if: runner.os == 'Windows'
-        working-directory: app
-        run: flutter build windows --release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $ErrorActionPreference = "Stop"
+          if ($IsWindows) {
+            $src = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+            $dest = Join-Path (Get-Location) "dist/qwirkle-digital-windows.zip"
+            Compress-Archive -Path (Join-Path $src "*") -DestinationPath $dest -Force
+          } elseif ($IsMacOS) {
+            $src = Join-Path (Get-Location) "build/macos/Build/Products/Release/qwirkle_digital.app"
+            $dest = Join-Path (Get-Location) "dist/qwirkle-digital-macos.zip"
+            Compress-Archive -Path $src -DestinationPath $dest -Force
+          } else {
+            $src = Join-Path (Get-Location) "build/linux/x64/release/bundle"
+            $dest = Join-Path (Get-Location) "dist/qwirkle-digital-linux.tar.gz"
+            tar -czf $dest -C $src .
+          }
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwirkle-digital-${{ matrix.name }}
+          path: app/dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release assets
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: qwirkle-digital-*
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: false
+          prerelease: false
