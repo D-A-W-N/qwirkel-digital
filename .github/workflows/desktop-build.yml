@@ -67,11 +67,24 @@ jobs:
           } elseif ($IsMacOS) {
             $src = Join-Path (Get-Location) "build/macos/Build/Products/Release/qwirkle_digital.app"
             $dest = Join-Path (Get-Location) "dist/qwirkle-digital-macos.zip"
-            Compress-Archive -Path $src -DestinationPath $dest -Force
+            # ditto (not Compress-Archive) to preserve the .app bundle's
+            # symlinks and Unix permission bits, which Compress-Archive
+            # doesn't reliably keep on non-Windows.
+            ditto -c -k --keepParent $src $dest
           } else {
             $src = Join-Path (Get-Location) "build/linux/x64/release/bundle"
             $dest = Join-Path (Get-Location) "dist/qwirkle-digital-linux.tar.gz"
             tar -czf $dest -C $src .
+          }
+
+      - name: Generate checksums
+        working-directory: app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Get-ChildItem dist -File | ForEach-Object {
+            $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+            Set-Content -Path "$($_.FullName).sha256" -Value "$hash  $($_.Name)" -NoNewline -Encoding ascii
           }
 
       - name: Upload build artifact
