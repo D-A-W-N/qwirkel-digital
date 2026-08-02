@@ -13,14 +13,12 @@ class NetworkLobbyScreen extends ConsumerStatefulWidget {
 }
 
 class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
-  final _hostController = TextEditingController(text: '127.0.0.1');
+  final _hostController = TextEditingController();
   final _portController = TextEditingController(text: '4040');
   final _nameController = TextEditingController(text: 'Spieler');
   String? _errorText;
-  final _signalingUrlController = TextEditingController(
-    text: 'ws://127.0.0.1:8080',
-  );
-  final _inviteCodeController = TextEditingController(text: 'qwirkle-01');
+  final _signalingUrlController = TextEditingController();
+  final _inviteCodeController = TextEditingController();
   bool _isHosting = false;
   String _connectionMode = 'lan';
   final List<String> _tips = [
@@ -100,14 +98,17 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
             ),
             const SizedBox(height: 12),
             if (_connectionMode == 'lan') ...[
-              TextField(
-                controller: _hostController,
-                decoration: const InputDecoration(
-                  labelText: 'Host-Adresse',
-                  border: OutlineInputBorder(),
+              if (!_isHosting) ...[
+                TextField(
+                  controller: _hostController,
+                  decoration: const InputDecoration(
+                    labelText: 'Host-Adresse',
+                    hintText: 'z. B. 192.168.1.23 (IP des Hosts)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: _portController,
                 keyboardType: TextInputType.number,
@@ -117,21 +118,31 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                 ),
               ),
             ] else ...[
-              TextField(
-                controller: _signalingUrlController,
-                decoration: const InputDecoration(
-                  labelText: 'Signaling-URL',
-                  border: OutlineInputBorder(),
+              if (_isHosting)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    'Signaling-URL und Einladungscode werden nach dem Start angezeigt und können dann geteilt werden.',
+                  ),
+                )
+              else ...[
+                TextField(
+                  controller: _signalingUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'Signaling-URL',
+                    hintText: 'z. B. ws://192.168.1.23:54321',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _inviteCodeController,
-                decoration: const InputDecoration(
-                  labelText: 'Einladungscode',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _inviteCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Einladungscode',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
+              ],
             ],
             const SizedBox(height: 16),
             if (_errorText != null) ...[

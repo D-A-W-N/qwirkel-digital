@@ -19,7 +19,12 @@ class NetworkGameView extends StatefulWidget {
   final GameStateSnapshot snapshot;
   final List<Tile> ownHand;
   final bool canInteract;
-  final Future<void> Function(List<TilePlacement> placements) onSendMove;
+
+  /// Sendet den Zug und liefert, ob er angenommen wurde — bei `false`
+  /// bleibt die vorläufige Platzierung stehen (z. B. damit ein abgelehnter
+  /// Zug sichtbar bleibt, statt kommentarlos zu verschwinden), bei `true`
+  /// wird sie geleert.
+  final Future<bool> Function(List<TilePlacement> placements) onSendMove;
   final String? statusText;
 
   @override
@@ -310,10 +315,12 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                               for (final entry in _pendingPlacements.entries)
                                 TilePlacement(position: entry.key, tile: entry.value),
                             ];
-                            await widget.onSendMove(placements);
+                            final accepted = await widget.onSendMove(placements);
                             setState(() {
-                              _pendingPlacements.clear();
-                              _selectedHandIndex = null;
+                              if (accepted) {
+                                _pendingPlacements.clear();
+                                _selectedHandIndex = null;
+                              }
                               _isSending = false;
                             });
                           }
