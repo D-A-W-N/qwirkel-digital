@@ -117,6 +117,10 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
               Text(
                 'Hausregel: Innerhalb eines Zugs dürfen deine neuen Steine auch die Richtung wechseln (z. B. eine T- oder L-Form bilden) – sie müssen dabei aber lückenlos zusammenhängen.',
               ),
+              SizedBox(height: 8),
+              Text(
+                'Hausregel: Bei mehreren Steinen in einem Zug zählt jeder Stein einzeln nach der Länge seiner Reihe zum Zeitpunkt seines Anlegens (z. B. bringen 3 Steine, die eine Reihe verlängern, 1+2+3 statt nur der fertigen Reihenlänge).',
+              ),
             ],
           ),
         ),

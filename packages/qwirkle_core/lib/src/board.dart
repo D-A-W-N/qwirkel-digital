@@ -86,34 +86,39 @@ class Board {
       }
     }
 
-    // Jeder neue Stein wertet seine eigene horizontale und vertikale Reihe.
-    // Reihen, die von mehreren neuen Steinen gemeinsam genutzt werden (der
-    // Normalfall bei einer einzelnen geraden Reihe), werden über ihre
-    // Startposition dedupliziert und nur einmal gewertet.
-    final linesToScore = <List<Tile>>[];
-    final scoredLineKeys = <String>{};
-    for (final placement in placements) {
-      for (final axis in _Axis.values) {
-        final line = _collectLine(placement.position, axis, merged);
-        if (line.tiles.length <= 1) continue;
-        final key = '$axis:${line.positions.first}';
-        if (!scoredLineKeys.add(key)) continue;
-        _validateLine(line);
-        linesToScore.add(line.tiles);
-      }
-    }
-
-    if (linesToScore.isEmpty) {
-      // Nur möglich beim allerersten Zug des Spiels mit genau einem Stein.
-      return placements.length;
-    }
-
+    // Hausregel: Jeder neu platzierte Stein erzeugt seinen eigenen Punktwert,
+    // abhängig von der Länge der Reihe(n) durch ihn in dem Moment, in dem er
+    // (in der Reihenfolge von [placements]) hinzugefügt wird - nicht nur
+    // einmal pro fertiger Reihe am Ende des Zugs. Bei einem Zug mit mehreren
+    // Steinen addieren sich so die Einzelwerte jedes Steins (z. B. eine Reihe
+    // aus 3 neuen Steinen in einem Zug: 1 + 2 + 3 = 6, nicht nur 3).
+    //
+    // Die Legalitätsprüfung einer Reihe (Attribut-Match, keine Dopplung,
+    // max. 6 Steine) erfolgt dabei automatisch mit: der letzte Stein, der zu
+    // einer Reihe gehört, sieht in seinem eigenen Inkrement bereits deren
+    // endgültigen, vollständigen Inhalt - eine frühere, noch unvollständige
+    // Zwischenprüfung derselben Reihe kann höchstens noch nicht erkennbare
+    // Verstöße übersehen, niemals einen echten Verstoß fälschlich melden.
+    final incremental = Map<Position, Tile>.from(_cells);
     var score = 0;
-    for (final line in linesToScore) {
-      score += line.length;
-      if (line.length == 6) {
-        score += 6;
+    for (final placement in placements) {
+      incremental[placement.position] = placement.tile;
+      var tileScore = 0;
+      for (final axis in _Axis.values) {
+        final line = _collectLine(placement.position, axis, incremental);
+        if (line.tiles.length <= 1) continue;
+        _validateLine(line);
+        tileScore += line.tiles.length;
+        if (line.tiles.length == 6) {
+          tileScore += 6;
+        }
       }
+      if (tileScore == 0 && incremental.length == 1) {
+        // Der allererste Stein des allerersten Zugs im Spiel: isoliert, ohne
+        // jede Reihe, zählt trotzdem 1 Punkt.
+        tileScore = 1;
+      }
+      score += tileScore;
     }
     return score;
   }

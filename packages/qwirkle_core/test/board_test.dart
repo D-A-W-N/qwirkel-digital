@@ -13,14 +13,14 @@ void main() {
       expect(score, 1);
     });
 
-    test('erster Zug: Reihe aus 3 Steinen gleicher Farbe', () {
+    test('erster Zug: Reihe aus 3 Steinen gleicher Farbe (je Stein einzeln gewertet: 1+2+3)', () {
       final board = Board();
       final placements = [
         _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
         _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
         _p(2, 0, const Tile(TileColor.red, TileShape.diamond)),
       ];
-      expect(board.scorePlacement(placements), 3);
+      expect(board.scorePlacement(placements), 6);
       board.apply(placements);
       expect(
         board.tileAt(const Position(1, 0)),
@@ -59,7 +59,7 @@ void main() {
       ); // 2 (horizontal: (0,1)+(1,1)) + 2 (vertikal: (1,0)+(1,1))
     });
 
-    test('vollständige Reihe aus 6 Steinen gibt Qwirkle-Bonus', () {
+    test('vollständige Reihe aus 6 Steinen gibt Qwirkle-Bonus (je Stein einzeln: 1+2+3+4+5+(6+6))', () {
       final board = Board();
       final placements = [
         _p(0, 0, const Tile(TileColor.green, TileShape.circle)),
@@ -69,7 +69,16 @@ void main() {
         _p(4, 0, const Tile(TileColor.green, TileShape.star)),
         _p(5, 0, const Tile(TileColor.green, TileShape.clover)),
       ];
-      expect(board.scorePlacement(placements), 12); // 6 + 6 Bonus
+      expect(board.scorePlacement(placements), 27); // 1+2+3+4+5+(6+6 Bonus)
+    });
+
+    test('Hausregel: 2 Steine in einem Zug (isolierter Erststein + Anlage) zählen 1+2', () {
+      final board = Board();
+      final score = board.scorePlacement([
+        _p(0, 0, const Tile(TileColor.red, TileShape.circle)),
+        _p(1, 0, const Tile(TileColor.red, TileShape.cross)),
+      ]);
+      expect(score, 3); // 1 (isolierter erster Stein) + 2 (Reihe aus 2)
     });
 
     test('wirft bei mehr als 6 Steinen pro Zug', () {
