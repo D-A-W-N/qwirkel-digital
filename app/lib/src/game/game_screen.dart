@@ -178,8 +178,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     }
     if (controller.hasPendingPlacements) {
       final score = controller.pendingScore;
+      // Zwei getrennte Zahlen, damit der Punktwert dieses einen Zugs nicht
+      // mit dem laufenden Gesamtstand der Partie verwechselt wird (siehe
+      // Nutzer-Feedback: beide wurden für dieselbe Zahl gehalten).
       final scoreSuffix = score != null
-          ? ' Aktuell $score Punkt${score == 1 ? '' : 'e'}.'
+          ? '\nDieser Zug: $score Punkt${score == 1 ? '' : 'e'} '
+                '· Gesamt danach: ${game.currentPlayer.score + score}'
           : '';
       return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.$scoreSuffix';
     }

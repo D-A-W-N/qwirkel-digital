@@ -81,7 +81,9 @@ void main() {
     expect(controller.pendingScore, 2); // Reihe: diamond + circle
 
     controller.stageTile(1, const Position(2, 0));
-    expect(controller.pendingScore, 3); // Reihe: diamond + circle + cross
+    // Hausregel: jeder neue Stein zählt einzeln nach Reihenlänge zum
+    // Zeitpunkt seines Anlegens - circle bei Länge 2, cross bei Länge 3.
+    expect(controller.pendingScore, 5); // 2 (diamond+circle) + 3 (+cross)
 
     controller.unstageTile(const Position(2, 0));
     expect(controller.pendingScore, 2);
