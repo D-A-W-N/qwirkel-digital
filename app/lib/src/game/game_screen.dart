@@ -11,6 +11,7 @@ import 'widgets/board_view.dart';
 import 'widgets/collapsible_game_panel.dart';
 import 'widgets/hand_view.dart';
 import 'widgets/score_panel.dart';
+import 'widgets/turn_dialog.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -22,7 +23,6 @@ class GameScreen extends ConsumerStatefulWidget {
 class _GameScreenState extends ConsumerState<GameScreen> {
   bool _exchangeMode = false;
   bool _gameOverShown = false;
-  bool _startAnnounced = false;
   Timer? _botTimer;
 
   /// Ob das untere Panel (Hand + Buttons) gerade ausgeklappt ist - startet
@@ -33,10 +33,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   /// Nutzer-Feedback zu wenig Spielfläche bei großer Systemschrift/Zoom.
   bool _panelExpanded = true;
 
-  /// Letzter `currentPlayerIndex`, für den das automatische Ausklappen schon
-  /// ausgelöst wurde - verhindert, dass ein manuelles Einklappen sofort im
-  /// selben Zug wieder rückgängig gemacht wird.
-  int? _lastAutoExpandedTurnIndex;
+  /// Letzter `currentPlayerIndex`, für den der "Du bist am Zug"-Hinweis
+  /// (Panel-Ausklappen + Dialog) schon ausgelöst wurde - verhindert
+  /// Mehrfachauslösung pro Zug und dass ein manuelles Einklappen sofort im
+  /// selben Zug wieder rückgängig gemacht wird. `null` markiert "noch nie
+  /// ausgelöst", damit der allererste Zug der Partie eine leicht andere
+  /// Formulierung bekommt (ersetzt den vormaligen einmaligen Start-Snackbar
+  /// - Nutzer-Feedback: der Zugwechsel war nicht immer sofort ersichtlich,
+  /// besonders beim lokalen Hotseat-Wechsel zwischen Personen).
+  int? _lastTurnAnnouncedIndex;
 
   @override
   void dispose() {
@@ -59,35 +64,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       _scheduleBotTurn(controller, settings.botSpeed);
     }
 
-    if (!_startAnnounced) {
-      _startAnnounced = true;
-      final starter = game.currentPlayer;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${starter.name} beginnt (längste mögliche Reihe aus der Starthand).',
-            ),
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      });
-    }
-
     // Sobald eine menschliche Person am Zug ist (Wechsel weg vom Bot ODER
     // Wechsel zur nächsten Person im lokalen Hotseat), klappt das Panel
-    // automatisch wieder auf - eine manuelle Zwischenzeit-Einklappung bleibt
-    // aber innerhalb desselben Zugs erhalten (nur EIN Trigger pro Zugwechsel).
+    // automatisch wieder auf UND ein wegklickbarer Dialog macht den
+    // Zugwechsel unübersehbar - eine manuelle Zwischenzeit-Einklappung
+    // bleibt aber innerhalb desselben Zugs erhalten (nur EIN Trigger pro
+    // Zugwechsel).
     if (!game.isOver &&
         !controller.isCurrentPlayerBot &&
-        game.currentPlayerIndex != _lastAutoExpandedTurnIndex) {
-      _lastAutoExpandedTurnIndex = game.currentPlayerIndex;
-      if (!_panelExpanded) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _panelExpanded = true);
-        });
-      }
+        game.currentPlayerIndex != _lastTurnAnnouncedIndex) {
+      final isFirstTurn = _lastTurnAnnouncedIndex == null;
+      _lastTurnAnnouncedIndex = game.currentPlayerIndex;
+      final playerName = game.currentPlayer.name;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!_panelExpanded) setState(() => _panelExpanded = true);
+        showTurnDialog(
+          context,
+          message: isFirstTurn
+              ? '$playerName beginnt (längste mögliche Reihe aus der Starthand).'
+              : '$playerName ist jetzt am Zug.',
+        );
+      });
     }
 
     return Scaffold(
