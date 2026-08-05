@@ -6,10 +6,17 @@ class ScorePanel extends StatelessWidget {
   final List<Player> players;
   final int currentIndex;
 
+  /// Punktestand pro Spieler:in, getrennt von [Player.score] - Netzwerkpartien
+  /// rekonstruieren `Player`-Objekte ohne Score (der kommt separat aus dem
+  /// `GameStateSnapshot`), das lokale Spiel nutzt stattdessen `Player.score`
+  /// direkt (Standard, wenn [scores] weggelassen wird).
+  final List<int>? scores;
+
   const ScorePanel({
     super.key,
     required this.players,
     required this.currentIndex,
+    this.scores,
   });
 
   @override
@@ -24,9 +31,10 @@ class ScorePanel extends StatelessWidget {
         itemBuilder: (context, index) {
           final active = index == currentIndex;
           final player = players[index];
+          final score = scores != null ? scores![index] : player.score;
           return Chip(
             avatar: active ? const Icon(Icons.play_arrow, size: 18) : null,
-            label: Text('${player.name}: ${player.score}'),
+            label: Text('${player.name}: $score ${score == 1 ? 'Punkt' : 'Punkte'}'),
             backgroundColor: active
                 ? Theme.of(context).colorScheme.tertiaryContainer
                 : null,

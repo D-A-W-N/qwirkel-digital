@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
-import '../game/widgets/board_geometry.dart';
-import '../game/widgets/centered_board_viewport.dart';
-import '../game/widgets/tile_view.dart';
+import '../game/widgets/board_surface.dart';
+import '../game/widgets/hand_view.dart';
+import '../game/widgets/score_panel.dart';
+import '../game/widgets/turn_status_banner.dart';
 
 class NetworkGameView extends StatefulWidget {
   const NetworkGameView({
@@ -63,6 +64,9 @@ class NetworkGameView extends StatefulWidget {
 }
 
 class _NetworkGameViewState extends State<NetworkGameView> {
+  static const double _cellSize = 64;
+  static const double _tileSize = 48;
+
   final Map<Position, Tile> _pendingPlacements = {};
 
   /// Merkt sich, welcher Hand-Index bereits vorläufig platziert wurde, damit
@@ -232,7 +236,31 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
   }
 
-  String _statusText(Map<Position, Tile> board, bool isMyTurn) {
+  /// Icon/Farbe/Text der zentralen Statuszeile - priorisiert wie im lokalen
+  /// Spiel (`GameScreen._statusIcon`/`_statusColor`/`_statusText`), aber mit
+  /// eigenen (Netzwerk-spezifischen) Zuständen. Fehler bleiben bewusst
+  /// AUSSERHALB dieser Priorisierung - sie bekommen weiterhin ihre eigene,
+  /// auffällige rote Box (siehe [build]), statt in der neutralen Statuszeile
+  /// womöglich untern zu gehen.
+  IconData _statusIcon(bool isMyTurn) {
+    if (widget.snapshot.isOver) return Icons.celebration_outlined;
+    if (_pendingPlacements.isNotEmpty) return Icons.add_circle_outline;
+    if (!isMyTurn) return Icons.hourglass_empty;
+    return Icons.play_circle_outline;
+  }
+
+  Color _statusColor(BuildContext context, bool isMyTurn) {
+    if (widget.snapshot.isOver) return Colors.green.shade700;
+    if (_pendingPlacements.isNotEmpty) return Colors.indigo.shade700;
+    if (!isMyTurn) return Theme.of(context).colorScheme.outline;
+    return Theme.of(context).colorScheme.primary;
+  }
+
+  String _statusText(
+    Map<Position, Tile> board,
+    bool isMyTurn,
+    String currentPlayerName,
+  ) {
     if (widget.snapshot.isOver) {
       return 'Die Partie ist beendet. Die Punkte werden nun ausgewertet.';
     }
@@ -247,7 +275,10 @@ class _NetworkGameViewState extends State<NetworkGameView> {
           : '';
       return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.$scoreSuffix';
     }
-    if (!isMyTurn) return 'Warte auf den nächsten Zug.';
+    // Nennt den Namen, statt nur generisch "auf den nächsten Zug" zu warten -
+    // übernimmt damit die einzige Information, die vorher exklusiv in der
+    // jetzt entfernten separaten "Aktueller Zug: X"-Zeile stand.
+    if (!isMyTurn) return 'Warte auf $currentPlayerName.';
     return 'Du bist am Zug. Ziehe einen Stein auf das Brett.';
   }
 
@@ -466,35 +497,22 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       body: SafeArea(
         child: Column(
           children: [
-            SizedBox(
-              height: 56,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                itemCount: players.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final player = players[index];
-                  final active = index == widget.snapshot.currentPlayerIndex;
-                  return Chip(
-                    avatar: active ? const Icon(Icons.play_arrow, size: 18) : null,
-                    label: Text('${player.name}: ${widget.snapshot.players[index].score} ${widget.snapshot.players[index].score == 1 ? 'Punkt' : 'Punkte'}'),
-                    backgroundColor: active
-                        ? Theme.of(context).colorScheme.tertiaryContainer
-                        : null,
-                  );
-                },
-              ),
+            ScorePanel(
+              players: players,
+              currentIndex: widget.snapshot.currentPlayerIndex,
+              scores: [for (final p in widget.snapshot.players) p.score],
             ),
             Expanded(
               child: Stack(
                 children: [
-                  _BoardSurface(
+                  BoardSurface(
                     board: board,
                     pendingPlacements: _pendingPlacements,
                     canInteract: widget.canInteract,
                     onDropTile: (handIndex, position) => _stageTile(board, handIndex, position),
                     onUnstage: _unstageTile,
+                    cellSize: _cellSize,
+                    tileSize: _tileSize,
                     highlightedPositions: lastMovePositions,
                   ),
                   if (_showStartPulse && !widget.snapshot.isOver)
@@ -646,48 +664,26 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     const SizedBox(height: 8),
                   ],
                   Text(
-                    widget.snapshot.isOver
-                        ? 'Partie beendet'
-                        : 'Aktueller Zug: ${currentPlayer.name}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
                     'Du spielst als ${myPlayer.name}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 64,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (var index = 0; index < handSlots.length; index++)
-                          _HandSlot(
-                            key: ValueKey('hand-$index'),
-                            index: index,
-                            tile: handSlots[index],
-                            canInteract: widget.canInteract,
-                            exchangeMode: _exchangeMode,
-                            selectedForExchange: _selectedForExchange.contains(index),
-                            onToggleExchange: () => _toggleExchangeSelection(index),
-                          ),
-                      ],
-                    ),
+                  HandRow(
+                    slots: handSlots,
+                    canInteract: widget.canInteract,
+                    exchangeMode: _exchangeMode,
+                    selectedForExchange: _selectedForExchange,
+                    onToggleExchange: _toggleExchangeSelection,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Deine Hand: ${widget.snapshot.players[widget.snapshot.yourPlayerIndex].handCount} Steine',
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(_statusText(board, isMyTurn)),
+                  TurnStatusBanner(
+                    icon: _statusIcon(isMyTurn),
+                    text: _statusText(board, isMyTurn, currentPlayer.name),
+                    color: _statusColor(context, isMyTurn),
                   ),
                   if (!widget.snapshot.isOver) ...[
                     const SizedBox(height: 8),
@@ -703,212 +699,3 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   }
 }
 
-class _HandSlot extends StatelessWidget {
-  const _HandSlot({
-    super.key,
-    required this.index,
-    required this.tile,
-    required this.canInteract,
-    required this.exchangeMode,
-    required this.selectedForExchange,
-    required this.onToggleExchange,
-  });
-
-  final int index;
-  final Tile? tile;
-  final bool canInteract;
-  final bool exchangeMode;
-  final bool selectedForExchange;
-  final VoidCallback onToggleExchange;
-
-  @override
-  Widget build(BuildContext context) {
-    final currentTile = tile;
-    if (currentTile == null) {
-      return const SizedBox(width: 48, height: 48);
-    }
-    if (!canInteract) {
-      return TileView(tile: currentTile);
-    }
-    if (exchangeMode) {
-      return GestureDetector(
-        onTap: onToggleExchange,
-        child: TileView(tile: currentTile, highlighted: selectedForExchange),
-      );
-    }
-    return Draggable<int>(
-      data: index,
-      feedback: Material(
-        color: Colors.transparent,
-        child: TileView(tile: currentTile, size: 56),
-      ),
-      childWhenDragging: Opacity(
-        opacity: 0.3,
-        child: TileView(tile: currentTile),
-      ),
-      child: TileView(tile: currentTile),
-    );
-  }
-}
-
-class _BoardSurface extends StatelessWidget {
-  const _BoardSurface({
-    required this.board,
-    required this.pendingPlacements,
-    required this.canInteract,
-    required this.onDropTile,
-    required this.onUnstage,
-    this.highlightedPositions = const {},
-  });
-
-  final Map<Position, Tile> board;
-  final Map<Position, Tile> pendingPlacements;
-  final bool canInteract;
-  final void Function(int handIndex, Position position) onDropTile;
-  final void Function(Position position) onUnstage;
-
-  /// Zuletzt von einer ANDEREN Person platzierte Steine - kurz hervorgehoben,
-  /// damit sichtbar ist, was gerade passiert ist (spiegelt die
-  /// Bot-Zug-Hervorhebung im lokalen Spiel).
-  final Set<Position> highlightedPositions;
-
-  static const double cellSize = 64;
-
-  @override
-  Widget build(BuildContext context) {
-    // Vorläufige (noch nicht gesendete) Platzierungen zählen mit in die
-    // Bounding Box, damit sich der sichtbare Bereich schon während des
-    // eigenen Zugs erweitert, statt erst nach dem nächsten Snapshot vom
-    // Server - spiegelt `BoardView`s lokales Verhalten.
-    final positions = [...board.keys, ...pendingPlacements.keys];
-    if (positions.isEmpty) {
-      positions.add(const Position(0, 0));
-    }
-
-    var minX = positions.first.x;
-    var maxX = positions.first.x;
-    var minY = positions.first.y;
-    var maxY = positions.first.y;
-
-    for (final position in positions) {
-      minX = minX < position.x ? minX : position.x;
-      maxX = maxX > position.x ? maxX : position.x;
-      minY = minY < position.y ? minY : position.y;
-      maxY = maxY > position.y ? maxY : position.y;
-    }
-
-    minX -= 2;
-    maxX += 2;
-    minY -= 2;
-    maxY += 2;
-
-    final boardPositions = <Position>[];
-    for (var x = minX; x <= maxX; x++) {
-      for (var y = minY; y <= maxY; y++) {
-        boardPositions.add(Position(x, y));
-      }
-    }
-
-    const geometry = BoardGeometry(cellSize);
-
-    return CenteredBoardViewport(
-      contentSize: Size(geometry.totalSize, geometry.totalSize),
-      focalPoint: Offset(
-        geometry.pixelX(((minX + maxX) / 2).round()),
-        geometry.pixelY(((minY + maxY) / 2).round()),
-      ),
-      child: Stack(
-        children: [
-          for (final position in boardPositions)
-            Positioned(
-              left: geometry.pixelX(position.x),
-              top: geometry.pixelY(position.y),
-              width: cellSize,
-              height: cellSize,
-              child: _BoardCell(
-                key: ValueKey('board-${position.x}-${position.y}'),
-                position: position,
-                existingTile: board[position],
-                pendingTile: pendingPlacements[position],
-                canInteract: canInteract,
-                onDropTile: onDropTile,
-                onUnstage: onUnstage,
-                highlighted: highlightedPositions.contains(position),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BoardCell extends StatelessWidget {
-  const _BoardCell({
-    super.key,
-    required this.position,
-    required this.existingTile,
-    required this.pendingTile,
-    required this.canInteract,
-    required this.onDropTile,
-    required this.onUnstage,
-    this.highlighted = false,
-  });
-
-  final Position position;
-  final Tile? existingTile;
-  final Tile? pendingTile;
-  final bool canInteract;
-  final void Function(int handIndex, Position position) onDropTile;
-  final void Function(Position position) onUnstage;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final existing = existingTile;
-    if (existing != null) {
-      return Center(
-        child: TileView(
-          tile: existing,
-          size: _BoardSurface.cellSize - 16,
-          highlighted: highlighted,
-          highlightColor: Colors.amber,
-        ),
-      );
-    }
-
-    final pending = pendingTile;
-    if (pending != null) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: canInteract ? () => onUnstage(position) : null,
-        child: Center(
-          child: TileView(
-            tile: pending,
-            size: _BoardSurface.cellSize - 16,
-            highlighted: true,
-          ),
-        ),
-      );
-    }
-
-    return DragTarget<int>(
-      onWillAcceptWithDetails: (details) => canInteract,
-      onAcceptWithDetails: (details) => onDropTile(details.data, position),
-      builder: (context, candidateData, rejectedData) {
-        final active = candidateData.isNotEmpty;
-        final colorScheme = Theme.of(context).colorScheme;
-        return Container(
-          margin: const EdgeInsets.all(1),
-          decoration: BoxDecoration(
-            color: active ? colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
-            border: Border.all(
-              color: active
-                  ? colorScheme.primary.withValues(alpha: 0.6)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}

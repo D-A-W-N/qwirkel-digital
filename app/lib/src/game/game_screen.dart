@@ -10,6 +10,7 @@ import 'game_providers.dart';
 import 'widgets/board_view.dart';
 import 'widgets/hand_view.dart';
 import 'widgets/score_panel.dart';
+import 'widgets/turn_status_banner.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -84,26 +85,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               players: game.players,
               currentIndex: game.currentPlayerIndex,
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
-              child: Row(
-                children: [
-                  Icon(
-                    _statusIcon(controller, game, _exchangeMode),
-                    size: 18,
-                    color: _statusColor(controller, game, _exchangeMode, context),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _statusText(controller, game, _exchangeMode),
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
+            TurnStatusBanner(
+              icon: _statusIcon(controller, game, _exchangeMode),
+              text: _statusText(controller, game, _exchangeMode),
+              color: _statusColor(controller, game, _exchangeMode, context),
             ),
             if (controller.lastError != null)
               Container(
