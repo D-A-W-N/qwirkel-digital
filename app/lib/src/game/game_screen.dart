@@ -8,7 +8,7 @@ import '../settings/app_settings.dart';
 import 'game_controller.dart';
 import 'game_providers.dart';
 import 'widgets/board_view.dart';
-import 'widgets/collapsible_game_panel.dart';
+import 'widgets/game_bottom_bar.dart';
 import 'widgets/hand_view.dart';
 import 'widgets/score_panel.dart';
 import 'widgets/turn_dialog.dart';
@@ -25,22 +25,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   bool _gameOverShown = false;
   Timer? _botTimer;
 
-  /// Ob das untere Panel (Hand + Buttons) gerade ausgeklappt ist - startet
-  /// ausgeklappt (vertraut, Hand sofort sichtbar) und klappt sich danach
-  /// automatisch wieder auf, sobald eine menschliche Person am Zug ist,
-  /// bleibt aber jederzeit manuell ein-/ausklappbar. Ein eingeklapptes
-  /// Panel lässt dem Brett fast die volle Bildschirmhöhe - siehe
-  /// Nutzer-Feedback zu wenig Spielfläche bei großer Systemschrift/Zoom.
-  bool _panelExpanded = true;
-
-  /// Letzter `currentPlayerIndex`, für den der "Du bist am Zug"-Hinweis
-  /// (Panel-Ausklappen + Dialog) schon ausgelöst wurde - verhindert
-  /// Mehrfachauslösung pro Zug und dass ein manuelles Einklappen sofort im
-  /// selben Zug wieder rückgängig gemacht wird. `null` markiert "noch nie
-  /// ausgelöst", damit der allererste Zug der Partie eine leicht andere
-  /// Formulierung bekommt (ersetzt den vormaligen einmaligen Start-Snackbar
-  /// - Nutzer-Feedback: der Zugwechsel war nicht immer sofort ersichtlich,
-  /// besonders beim lokalen Hotseat-Wechsel zwischen Personen).
+  /// Letzter `currentPlayerIndex`, für den der "Du bist am Zug"-Dialog schon
+  /// ausgelöst wurde - verhindert Mehrfachauslösung pro Zug. `null` markiert
+  /// "noch nie ausgelöst", damit der allererste Zug der Partie eine leicht
+  /// andere Formulierung bekommt (ersetzt den vormaligen einmaligen
+  /// Start-Snackbar - Nutzer-Feedback: der Zugwechsel war nicht immer sofort
+  /// ersichtlich, besonders beim lokalen Hotseat-Wechsel zwischen Personen).
   int? _lastTurnAnnouncedIndex;
 
   @override
@@ -65,10 +55,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     }
 
     // Sobald eine menschliche Person am Zug ist (Wechsel weg vom Bot ODER
-    // Wechsel zur nächsten Person im lokalen Hotseat), klappt das Panel
-    // automatisch wieder auf UND ein wegklickbarer Dialog macht den
-    // Zugwechsel unübersehbar - eine manuelle Zwischenzeit-Einklappung
-    // bleibt aber innerhalb desselben Zugs erhalten (nur EIN Trigger pro
+    // Wechsel zur nächsten Person im lokalen Hotseat), macht ein
+    // wegklickbarer Dialog den Zugwechsel unübersehbar (nur EIN Trigger pro
     // Zugwechsel).
     if (!game.isOver &&
         !controller.isCurrentPlayerBot &&
@@ -78,7 +66,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       final playerName = game.currentPlayer.name;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (!_panelExpanded) setState(() => _panelExpanded = true);
         showTurnDialog(
           context,
           message: isFirstTurn
@@ -117,27 +104,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 child: const BoardView(),
               ),
             ),
-            // Bewusst ein normales Column-Kind statt eines `Positioned`-
-            // Overlays über dem Brett: ein Overlay würde bei ausgeklapptem
-            // Panel den unteren Brett-Bereich zwar nur optisch verdecken,
-            // aber auch dessen Drag-Ziele blockieren (das Panel läge im
-            // Stack darüber und würde Drops abfangen, bevor sie das Brett
-            // erreichen). Als Column-Kind bekommt das Brett stattdessen via
-            // `Expanded` immer exakt die tatsächlich verbleibende (und
-            // damit vollständig nutzbare) Höhe.
-            CollapsibleGamePanel(
-              expanded: _panelExpanded,
-              onExpandedChanged: (value) =>
-                  setState(() => _panelExpanded = value),
-              collapsedIcon: _statusIcon(controller, game, _exchangeMode),
-              collapsedText: _statusText(controller, game, _exchangeMode),
-              collapsedColor: _statusColor(
+            GameBottomBar(
+              statusIcon: _statusIcon(controller, game, _exchangeMode),
+              statusText: _statusText(controller, game, _exchangeMode),
+              statusColor: _statusColor(
                 controller,
                 game,
                 _exchangeMode,
                 context,
               ),
-              expandedChild: _ControlPanel(
+              child: _ControlPanel(
                 exchangeMode: _exchangeMode,
                 enabled: !controller.isCurrentPlayerBot,
                 onToggleMode: () {

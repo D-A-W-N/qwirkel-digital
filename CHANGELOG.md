@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.16] - 2026-08-05
+
+- Replaced the collapsible bottom panel from 0.9.13 with a fixed, always-visible bar - the collapse/expand toggle never actually helped in practice (nothing worth hiding while waiting, forced open on your own turn anyway to reach the hand)
+
 ## [0.9.15] - 2026-08-05
 
 - Fixed internet play occasionally freezing after a dropped connection (e.g. when the server backend redeploys mid-game) - the client/room owner now automatically retries reconnecting with a growing backoff instead of requiring a manual leave-and-rejoin
