@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-08-05
+
+- Local and network play now share the same board, hand, score and status-banner widgets instead of parallel, drifting implementations - network play's chrome is noticeably leaner as a result (one redundant status line/banner removed), and the waiting status now names who you're waiting for
+
 ## [0.9.11] - 2026-08-05
 
 - Fixed a bug where restarting a network/LAN game could leave a "ghost" tile on the fresh board (a placement staged but never sent right before the previous game ended) and taking it back would swap in an unrelated tile from the new hand
