@@ -8,9 +8,9 @@ import '../settings/app_settings.dart';
 import 'game_controller.dart';
 import 'game_providers.dart';
 import 'widgets/board_view.dart';
+import 'widgets/collapsible_game_panel.dart';
 import 'widgets/hand_view.dart';
 import 'widgets/score_panel.dart';
-import 'widgets/turn_status_banner.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -24,6 +24,19 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   bool _gameOverShown = false;
   bool _startAnnounced = false;
   Timer? _botTimer;
+
+  /// Ob das untere Panel (Hand + Buttons) gerade ausgeklappt ist - startet
+  /// ausgeklappt (vertraut, Hand sofort sichtbar) und klappt sich danach
+  /// automatisch wieder auf, sobald eine menschliche Person am Zug ist,
+  /// bleibt aber jederzeit manuell ein-/ausklappbar. Ein eingeklapptes
+  /// Panel lässt dem Brett fast die volle Bildschirmhöhe - siehe
+  /// Nutzer-Feedback zu wenig Spielfläche bei großer Systemschrift/Zoom.
+  bool _panelExpanded = true;
+
+  /// Letzter `currentPlayerIndex`, für den das automatische Ausklappen schon
+  /// ausgelöst wurde - verhindert, dass ein manuelles Einklappen sofort im
+  /// selben Zug wieder rückgängig gemacht wird.
+  int? _lastAutoExpandedTurnIndex;
 
   @override
   void dispose() {
@@ -62,6 +75,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       });
     }
 
+    // Sobald eine menschliche Person am Zug ist (Wechsel weg vom Bot ODER
+    // Wechsel zur nächsten Person im lokalen Hotseat), klappt das Panel
+    // automatisch wieder auf - eine manuelle Zwischenzeit-Einklappung bleibt
+    // aber innerhalb desselben Zugs erhalten (nur EIN Trigger pro Zugwechsel).
+    if (!game.isOver &&
+        !controller.isCurrentPlayerBot &&
+        game.currentPlayerIndex != _lastAutoExpandedTurnIndex) {
+      _lastAutoExpandedTurnIndex = game.currentPlayerIndex;
+      if (!_panelExpanded) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _panelExpanded = true);
+        });
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Qwirkle · Beutel: ${game.bag.remaining}'),
@@ -85,36 +113,43 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               players: game.players,
               currentIndex: game.currentPlayerIndex,
             ),
-            TurnStatusBanner(
-              icon: _statusIcon(controller, game, _exchangeMode),
-              text: _statusText(controller, game, _exchangeMode),
-              color: _statusColor(controller, game, _exchangeMode, context),
-            ),
-            if (controller.lastError != null)
-              Container(
-                width: double.infinity,
-                color: Colors.red.shade100,
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  controller.lastError!,
-                  style: TextStyle(color: Colors.red.shade900),
-                ),
-              ),
             Expanded(
               child: IgnorePointer(
                 ignoring: controller.isCurrentPlayerBot,
                 child: const BoardView(),
               ),
             ),
-            _ControlPanel(
-              exchangeMode: _exchangeMode,
-              enabled: !controller.isCurrentPlayerBot,
-              onToggleMode: () {
-                setState(() => _exchangeMode = !_exchangeMode);
-                controller.resetPendingPlacements();
-                controller.clearExchangeSelection();
-              },
-              onExchangeConfirmed: () => setState(() => _exchangeMode = false),
+            // Bewusst ein normales Column-Kind statt eines `Positioned`-
+            // Overlays über dem Brett: ein Overlay würde bei ausgeklapptem
+            // Panel den unteren Brett-Bereich zwar nur optisch verdecken,
+            // aber auch dessen Drag-Ziele blockieren (das Panel läge im
+            // Stack darüber und würde Drops abfangen, bevor sie das Brett
+            // erreichen). Als Column-Kind bekommt das Brett stattdessen via
+            // `Expanded` immer exakt die tatsächlich verbleibende (und
+            // damit vollständig nutzbare) Höhe.
+            CollapsibleGamePanel(
+              expanded: _panelExpanded,
+              onExpandedChanged: (value) =>
+                  setState(() => _panelExpanded = value),
+              collapsedIcon: _statusIcon(controller, game, _exchangeMode),
+              collapsedText: _statusText(controller, game, _exchangeMode),
+              collapsedColor: _statusColor(
+                controller,
+                game,
+                _exchangeMode,
+                context,
+              ),
+              expandedChild: _ControlPanel(
+                exchangeMode: _exchangeMode,
+                enabled: !controller.isCurrentPlayerBot,
+                onToggleMode: () {
+                  setState(() => _exchangeMode = !_exchangeMode);
+                  controller.resetPendingPlacements();
+                  controller.clearExchangeSelection();
+                },
+                onExchangeConfirmed: () =>
+                    setState(() => _exchangeMode = false),
+              ),
             ),
           ],
         ),
@@ -241,61 +276,56 @@ class _ControlPanel extends ConsumerWidget {
         controller.game.bag.isEmpty &&
         !controller.hasPendingPlacements;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IgnorePointer(
-            ignoring: !enabled,
-            child: Opacity(
-              opacity: enabled ? 1 : 0.5,
-              child: HandView(exchangeMode: exchangeMode),
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IgnorePointer(
+          ignoring: !enabled,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.5,
+            child: HandView(exchangeMode: exchangeMode),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              if (!exchangeMode) ...[
-                ElevatedButton(
-                  onPressed: enabled && controller.hasPendingPlacements
-                      ? controller.confirmMove
-                      : null,
-                  child: const Text('Zug bestätigen'),
-                ),
-                OutlinedButton(
-                  onPressed: enabled && controller.hasPendingPlacements
-                      ? controller.resetPendingPlacements
-                      : null,
-                  child: const Text('Zurücknehmen'),
-                ),
-              ] else
-                ElevatedButton(
-                  onPressed: enabled && controller.hasExchangeSelection
-                      ? () {
-                          controller.confirmExchange();
-                          onExchangeConfirmed();
-                        }
-                      : null,
-                  child: const Text('Steine tauschen'),
-                ),
-              TextButton(
-                onPressed: enabled ? onToggleMode : null,
-                child: Text(exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            if (!exchangeMode) ...[
+              ElevatedButton(
+                onPressed: enabled && controller.hasPendingPlacements
+                    ? controller.confirmMove
+                    : null,
+                child: const Text('Zug bestätigen'),
               ),
-              if (canPass)
-                OutlinedButton(
-                  onPressed: controller.passTurn,
-                  child: const Text('Aussetzen'),
-                ),
-            ],
-          ),
-        ],
-      ),
+              OutlinedButton(
+                onPressed: enabled && controller.hasPendingPlacements
+                    ? controller.resetPendingPlacements
+                    : null,
+                child: const Text('Zurücknehmen'),
+              ),
+            ] else
+              ElevatedButton(
+                onPressed: enabled && controller.hasExchangeSelection
+                    ? () {
+                        controller.confirmExchange();
+                        onExchangeConfirmed();
+                      }
+                    : null,
+                child: const Text('Steine tauschen'),
+              ),
+            TextButton(
+              onPressed: enabled ? onToggleMode : null,
+              child: Text(exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
+            ),
+            if (canPass)
+              OutlinedButton(
+                onPressed: controller.passTurn,
+                child: const Text('Aussetzen'),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
