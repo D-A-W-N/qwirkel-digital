@@ -58,7 +58,7 @@ class _CenteredBoardViewportState extends State<CenteredBoardViewport> {
       constrained: false,
       minScale: 0.4,
       maxScale: 2.5,
-      boundaryMargin: const EdgeInsets.all(400),
+      boundaryMargin: const EdgeInsets.all(150),
       child: SizedBox(
         width: widget.contentSize.width,
         height: widget.contentSize.height,
