@@ -77,7 +77,7 @@ void main() {
     );
 
     test(
-      'letzter Stein bei leerem Beutel gibt Bonus, beendet die Partie aber nicht, solange andere noch Steine haben',
+      'letzter Stein bei leerem Beutel beendet die Partie nicht, solange andere noch Steine haben',
       () {
         // Hausregel: die Partie endet nicht sofort, wenn eine Person ihre
         // Hand bei leerem Beutel leert - die übrigen spielen regulär
@@ -101,8 +101,8 @@ void main() {
           ),
         ]);
 
-        expect(score, 1 + 6); // 1 Punkt + 6 Bonus für leere Hand
-        expect(anna.score, 7);
+        expect(score, 1); // kein Bonus fürs Leeren der Hand (Hausregel)
+        expect(anna.score, 1);
         expect(anna.hand, isEmpty);
         expect(game.isOver, isFalse);
         expect(game.currentPlayer, ben);
@@ -129,7 +129,7 @@ void main() {
           ),
         ]);
 
-        expect(score, 1 + 6);
+        expect(score, 1); // kein Bonus fürs Leeren der Hand (Hausregel)
         expect(ben.hand, isEmpty);
         expect(game.isOver, isTrue);
       },

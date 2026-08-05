@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-08-05
+
+- Changed house rule: emptying your hand no longer awards a 6-point bonus
+
 ## [0.9.7] - 2026-08-05
 
 - Changed house rule: the game no longer ends the instant one player empties their hand while the bag is empty - it now continues until every player's hand is empty (or nobody can move), so players who still have tiles get to keep playing; everyone who empties their hand still gets the usual 6-point bonus, not just the first
