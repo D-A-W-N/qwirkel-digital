@@ -110,9 +110,13 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
             children: [
               Text('Bilde Reihen aus Farben oder Formen.'),
               SizedBox(height: 8),
-              Text('Jeder Zug bringt Punkte, wenn die Reihen logisch aufgebaut sind.'),
+              Text(
+                'Jeder Zug bringt Punkte, wenn die Reihen logisch aufgebaut sind.',
+              ),
               SizedBox(height: 8),
-              Text('Wenn du unsicher bist, probiere zuerst einfache Reihen mit gleichen Farben oder Formen.'),
+              Text(
+                'Wenn du unsicher bist, probiere zuerst einfache Reihen mit gleichen Farben oder Formen.',
+              ),
               SizedBox(height: 8),
               Text(
                 'Hausregel: Innerhalb eines Zugs dürfen deine neuen Steine auch die Richtung wechseln (z. B. eine T- oder L-Form bilden) – sie müssen dabei aber lückenlos zusammenhängen.',
@@ -137,114 +141,146 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   void _showSettingsSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      // Ohne das ist die Sheet-Höhe auf einen festen Bruchteil des
+      // Bildschirms gedeckelt (Standard von `showModalBottomSheet`) UND der
+      // Inhalt war nicht scrollbar - bei großer Systemschrift/Zoom (siehe
+      // Nutzer-Feedback: Update-Bereich für sehbehinderten Freund nicht
+      // erreichbar) überlief die Spalte dann einfach nach unten aus dem
+      // Bildschirm, ohne jede Möglichkeit, dorthin zu scrollen.
+      isScrollControlled: true,
       builder: (context) {
         return Consumer(
           builder: (context, ref, child) {
             final settings = ref.watch(appSettingsProvider);
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Einstellungen',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile.adaptive(
-                    value: settings.animationsEnabled,
-                    onChanged: (value) async {
-                      final nextSettings = ref.read(appSettingsProvider).copyWith(
-                        animationsEnabled: value,
-                      );
-                      ref.read(appSettingsProvider.notifier).state = nextSettings;
-                      await saveAppSettings(nextSettings);
-                    },
-                    title: const Text('Animationen'),
-                    subtitle: const Text('Aktiviert sanfte Übergänge im Spiel.'),
-                  ),
-                  SwitchListTile.adaptive(
-                    value: settings.tipsEnabled,
-                    onChanged: (value) async {
-                      final nextSettings = ref.read(appSettingsProvider).copyWith(
-                        tipsEnabled: value,
-                      );
-                      ref.read(appSettingsProvider.notifier).state = nextSettings;
-                      await saveAppSettings(nextSettings);
-                    },
-                    title: const Text('Hinweise'),
-                    subtitle: const Text('Zeigt kurze Tipps im Spiel und in der Lobby.'),
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Bot-Geschwindigkeit', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Wie lange ein Bot vor seinem Zug "nachdenkt".',
-                          style: Theme.of(context).textTheme.bodySmall,
+            return SafeArea(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+                ),
+                child: SingleChildScrollView(
+                  key: const Key('settingsSheetScrollView'),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Einstellungen',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile.adaptive(
+                        value: settings.animationsEnabled,
+                        onChanged: (value) async {
+                          final nextSettings = ref
+                              .read(appSettingsProvider)
+                              .copyWith(animationsEnabled: value);
+                          ref.read(appSettingsProvider.notifier).state =
+                              nextSettings;
+                          await saveAppSettings(nextSettings);
+                        },
+                        title: const Text('Animationen'),
+                        subtitle: const Text(
+                          'Aktiviert sanfte Übergänge im Spiel.',
                         ),
-                        const SizedBox(height: 8),
-                        SegmentedButton<BotSpeed>(
-                          segments: [
-                            for (final speed in BotSpeed.values)
-                              ButtonSegment(value: speed, label: Text(speed.label)),
-                          ],
-                          selected: {settings.botSpeed},
-                          onSelectionChanged: (selection) async {
-                            final nextSettings = ref
-                                .read(appSettingsProvider)
-                                .copyWith(botSpeed: selection.first);
-                            ref.read(appSettingsProvider.notifier).state = nextSettings;
-                            await saveAppSettings(nextSettings);
-                          },
+                      ),
+                      SwitchListTile.adaptive(
+                        value: settings.tipsEnabled,
+                        onChanged: (value) async {
+                          final nextSettings = ref
+                              .read(appSettingsProvider)
+                              .copyWith(tipsEnabled: value);
+                          ref.read(appSettingsProvider.notifier).state =
+                              nextSettings;
+                          await saveAppSettings(nextSettings);
+                        },
+                        title: const Text('Hinweise'),
+                        subtitle: const Text(
+                          'Zeigt kurze Tipps im Spiel und in der Lobby.',
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const UpdateSettingsSection(),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (dialogContext) => AlertDialog(
-                            title: const Text('Einstellungen zurücksetzen?'),
-                            content: const Text(
-                              'Damit werden Animationen, Tipps und Bot-Geschwindigkeit auf die Standardwerte zurückgesetzt.',
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Bot-Geschwindigkeit',
+                              style: Theme.of(context).textTheme.titleSmall,
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(dialogContext).pop(false),
-                                child: const Text('Abbrechen'),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Wie lange ein Bot vor seinem Zug "nachdenkt".',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            SegmentedButton<BotSpeed>(
+                              segments: [
+                                for (final speed in BotSpeed.values)
+                                  ButtonSegment(
+                                    value: speed,
+                                    label: Text(speed.label),
+                                  ),
+                              ],
+                              selected: {settings.botSpeed},
+                              onSelectionChanged: (selection) async {
+                                final nextSettings = ref
+                                    .read(appSettingsProvider)
+                                    .copyWith(botSpeed: selection.first);
+                                ref.read(appSettingsProvider.notifier).state =
+                                    nextSettings;
+                                await saveAppSettings(nextSettings);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const UpdateSettingsSection(),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: const Text(
+                                  'Einstellungen zurücksetzen?',
+                                ),
+                                content: const Text(
+                                  'Damit werden Animationen, Tipps und Bot-Geschwindigkeit auf die Standardwerte zurückgesetzt.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(false),
+                                    child: const Text('Abbrechen'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogContext).pop(true),
+                                    child: const Text('Zurücksetzen'),
+                                  ),
+                                ],
                               ),
-                              FilledButton(
-                                onPressed: () => Navigator.of(dialogContext).pop(true),
-                                child: const Text('Zurücksetzen'),
-                              ),
-                            ],
-                          ),
-                        );
+                            );
 
-                        if (confirmed == true) {
-                          await resetAppSettings(ref);
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.restore),
-                      label: const Text('Auf Standard zurücksetzen'),
-                    ),
+                            if (confirmed == true) {
+                              await resetAppSettings(ref);
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.restore),
+                          label: const Text('Auf Standard zurücksetzen'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -281,168 +317,169 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Qwirkle digital',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Spiele lokal mit Freunden, gegen Bots oder über LAN/Internet mit anderen Spieler:innen.',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => _showHowToPlayDialog(context),
-                    icon: const Icon(Icons.help_outline),
-                    label: const Text('Anleitung'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showSettingsSheet(context),
-                    icon: const Icon(Icons.tune),
-                    label: const Text('Einstellungen'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Anzahl Spieler (Pass & Play, $minPlayers-$maxPlayers)',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: _playerCount > minPlayers
-                      ? () => setState(() => _playerCount--)
-                      : null,
-                  icon: const Icon(Icons.remove_circle_outline),
-                ),
-                Text(
-                  '$_playerCount',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                IconButton(
-                  onPressed: _playerCount < maxPlayers
-                      ? () => setState(() => _playerCount++)
-                      : null,
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Netzwerk spielen',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Hoste ein Spiel oder tritt über LAN/Internet einer Partie bei.',
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton.tonal(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const NetworkLobbyScreen(),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Qwirkle digital',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Spiele lokal mit Freunden, gegen Bots oder über LAN/Internet mit anderen Spieler:innen.',
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      child: const Text('Netzwerk-Setup öffnen'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Spieler und Gegner',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _playerCount,
-              itemBuilder: (context, i) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextField(
-                        controller: _nameControllers[i],
-                        decoration: InputDecoration(
-                          labelText: 'Name Spieler ${i + 1}',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<BotDifficulty?>(
-                        initialValue: _botDifficulties[i],
-                        decoration: const InputDecoration(
-                          labelText: 'Typ',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: null,
-                            child: Text('Mensch'),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: () => _showHowToPlayDialog(context),
+                              icon: const Icon(Icons.help_outline),
+                              label: const Text('Anleitung'),
+                            ),
                           ),
-                          DropdownMenuItem(
-                            value: BotDifficulty.easy,
-                            child: Text('Bot: Leicht'),
-                          ),
-                          DropdownMenuItem(
-                            value: BotDifficulty.medium,
-                            child: Text('Bot: Mittel'),
-                          ),
-                          DropdownMenuItem(
-                            value: BotDifficulty.hard,
-                            child: Text('Bot: Schwer'),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showSettingsSheet(context),
+                              icon: const Icon(Icons.tune),
+                              label: const Text('Einstellungen'),
+                            ),
                           ),
                         ],
-                        onChanged: (value) =>
-                            setState(() => _botDifficulties[i] = value),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _startGame,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Spiel starten'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Anzahl Spieler (Pass & Play, $minPlayers-$maxPlayers)',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: _playerCount > minPlayers
+                                ? () => setState(() => _playerCount--)
+                                : null,
+                            icon: const Icon(Icons.remove_circle_outline),
+                          ),
+                          Text(
+                            '$_playerCount',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          IconButton(
+                            onPressed: _playerCount < maxPlayers
+                                ? () => setState(() => _playerCount++)
+                                : null,
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Netzwerk spielen',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Hoste ein Spiel oder tritt über LAN/Internet einer Partie bei.',
+                              ),
+                              const SizedBox(height: 8),
+                              FilledButton.tonal(
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const NetworkLobbyScreen(),
+                                  ),
+                                ),
+                                child: const Text('Netzwerk-Setup öffnen'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Spieler und Gegner',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _playerCount,
+                        itemBuilder: (context, i) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: _nameControllers[i],
+                                  decoration: InputDecoration(
+                                    labelText: 'Name Spieler ${i + 1}',
+                                    border: const OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: DropdownButtonFormField<BotDifficulty?>(
+                                  initialValue: _botDifficulties[i],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Typ',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: null,
+                                      child: Text('Mensch'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: BotDifficulty.easy,
+                                      child: Text('Bot: Leicht'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: BotDifficulty.medium,
+                                      child: Text('Bot: Mittel'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: BotDifficulty.hard,
+                                      child: Text('Bot: Schwer'),
+                                    ),
+                                  ],
+                                  onChanged: (value) => setState(
+                                    () => _botDifficulties[i] = value,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _startGame,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Text('Spiel starten'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
