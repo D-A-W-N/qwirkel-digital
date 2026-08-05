@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-05
+
+- Fixed a shutdown race in the internet-server backend where force-closing the HTTP server could trigger disconnect-handling writes that arrived after the server had already reported itself fully shut down (relevant for redeploys, caught by qwirkle_server's own macOS CI run)
+
 ## [0.9.0] - 2026-08-05
 
 - Replaced Internet-Mehrspieler's WebRTC/P2P approach (which required the host to be reachable from outside, i.e. port forwarding, and had no TURN fallback) with a dedicated, always-on backend server (`packages/qwirkle_server`) run on a VPS via Coolify and auto-deployed via GitHub Actions on release tags: players only ever make outbound connections to the server, disconnected players' seats wait to be reclaimed via a reconnect token instead of being auto-skipped, and rooms are persisted to disk so a server redeploy or a days-long pause never loses a running game. LAN play is unaffected.
