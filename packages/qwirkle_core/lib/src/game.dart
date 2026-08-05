@@ -20,6 +20,11 @@ class QwirkleGame {
   /// niemand mehr etwas Sinnvolles tun kann.
   int _consecutivePasses = 0;
 
+  /// Für die Persistenz (z. B. `qwirkle_net`s Raum-Serialisierung): Anzahl
+  /// der aktuell aufeinanderfolgenden Pässe, damit eine wiederhergestellte
+  /// Partie exakt an derselben Stelle in der Pass-Kette weiterläuft.
+  int get consecutivePasses => _consecutivePasses;
+
   QwirkleGame({
     required this.players,
     TileBag? bag,
@@ -33,6 +38,24 @@ class QwirkleGame {
       players,
       tieBreaker: startingPlayerTieBreaker,
     );
+  }
+
+  /// Stellt eine zuvor persistierte Partie exakt wieder her — anders als der
+  /// Standard-Konstruktor werden weder neue Starthände gezogen noch wird
+  /// eine:r Startspieler:in bestimmt, sondern der übergebene Zustand 1:1
+  /// übernommen ([players] mit ihren gespeicherten Händen/Punkten, [bag] mit
+  /// den exakten Rest-Steinen, z. B. via [TileBag.fromTiles]). Das Brett
+  /// bleibt leer und muss der Aufrufer direkt danach per `board.apply(...)`
+  /// befüllen, da [Board] keinen eigenen Restore-Weg braucht (`apply`
+  /// validiert ohnehin nichts).
+  QwirkleGame.restore({
+    required this.players,
+    required this.bag,
+    required this.currentPlayerIndex,
+    required this.isOver,
+    int consecutivePasses = 0,
+  }) : _consecutivePasses = consecutivePasses {
+    assert(players.isNotEmpty, 'Es wird mindestens ein Spieler benötigt.');
   }
 
   Player get currentPlayer => players[currentPlayerIndex];

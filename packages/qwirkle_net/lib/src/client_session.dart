@@ -27,6 +27,20 @@ class ClientSession {
 
   GameStateSnapshot? _latestSnapshot;
 
+  /// Vom `qwirkle_server`-Backend zugewiesener Raum-Code (nur beim Verbinden
+  /// über [WebSocketTransport] gesetzt) - `null` im LAN-Modus.
+  String? roomCode;
+
+  /// Reconnect-Token für diesen Sitzplatz (nur `qwirkle_server`-Backend) -
+  /// muss lokal gespeichert und bei einer erneuten [connectVia] als
+  /// [reconnectToken]-Argument mitgeschickt werden, um nach einer Trennung
+  /// denselben Sitzplatz (inkl. Hand/Punktestand) zurückzufordern.
+  String? reconnectToken;
+
+  /// Nur `qwirkle_server`-Backend: ob dieser Sitzplatz die Owner-Rechte im
+  /// Raum hat und daher [sendStartGame]/[sendRestartGame] aufrufen darf.
+  bool isRoomOwner = false;
+
   Stream<LobbyMessage> get lobbyUpdates => _lobbyController.stream;
   Stream<GameStateSnapshot> get stateUpdates {
     if (_latestSnapshot == null) {
@@ -62,10 +76,15 @@ class ClientSession {
   }
 
   /// Tritt über einen beliebigen bereits verbundenen [transport] der Lobby
-  /// bei.
+  /// bei. [roomCode]/[reconnectToken] sind nur für das `qwirkle_server`-
+  /// Backend relevant (`null` erstellt dort einen neuen Raum, ein
+  /// vorhandenes [reconnectToken] fordert einen zuvor verlassenen
+  /// Sitzplatz zurück) - `HostSession` (LAN) ignoriert beide.
   Future<void> connectVia(
     MessageTransport transport, {
     required String name,
+    String? roomCode,
+    String? reconnectToken,
   }) async {
     _transport = transport;
     _subscription = transport.lines.listen(
@@ -74,7 +93,13 @@ class ClientSession {
       onError: (_) => _handleDisconnect(),
     );
     _statusController.add('Tritt der Lobby bei');
-    transport.send(JoinMessage(name).encode());
+    transport.send(
+      JoinMessage(
+        name,
+        roomCode: roomCode,
+        reconnectToken: reconnectToken,
+      ).encode(),
+    );
     await _welcomeController.stream.first;
     _statusController.add('Lobby-Beitritt bestätigt');
   }
@@ -90,6 +115,9 @@ class ClientSession {
   void _handleLine(String line) {
     final message = decodeMessage(line);
     if (message is WelcomeMessage) {
+      roomCode = message.roomCode;
+      reconnectToken = message.reconnectToken;
+      isRoomOwner = message.isOwner;
       _welcomeController.add(message.playerId);
     } else if (message is LobbyMessage) {
       _statusController.add('Lobby aktualisiert');
@@ -113,6 +141,20 @@ class ClientSession {
 
   void sendPass() {
     _transport!.send(PassMessage().encode());
+  }
+
+  /// Nur `qwirkle_server`-Backend: fordert als Raumersteller:in den
+  /// Spielstart an (`HostSession` startet im LAN-Modus stattdessen lokal
+  /// über `HostSession.startGame()`).
+  void sendStartGame() {
+    _transport!.send(StartGameMessage().encode());
+  }
+
+  /// Nur `qwirkle_server`-Backend: fordert als Raumersteller:in einen
+  /// Partie-Neustart an (`HostSession` startet im LAN-Modus stattdessen
+  /// lokal über `HostSession.restartGame()`).
+  void sendRestartGame() {
+    _transport!.send(RestartGameMessage().encode());
   }
 
   Future<void> close() async {

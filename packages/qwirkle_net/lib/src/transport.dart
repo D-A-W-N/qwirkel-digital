@@ -38,3 +38,41 @@ class TcpTransport implements MessageTransport {
   @override
   Future<void> close() => _socket.close();
 }
+
+/// WebSocket-basierter Transport für Internet-Spiele über den dedizierten
+/// Server (`qwirkle_server`). Kein Zeilen-Framing nötig wie bei
+/// [TcpTransport]: jede WebSocket-Textnachricht ist bereits eine
+/// eigenständige Einheit, die genau einer [NetMessage] entspricht.
+///
+/// [lines] ist bewusst ein Broadcast-Stream (statt den Socket-Stream direkt
+/// durchzureichen wie [TcpTransport]): `RoomManager` liest die allererste
+/// Nachricht, um den richtigen Raum zu ermitteln, bevor `RoomSession` ab der
+/// zweiten Nachricht selbst zuhört - ein reiner Socket-Stream erlaubt aber
+/// nur genau ein `listen()` über seine gesamte Lebensdauer, selbst nach
+/// `cancel()` eines vorherigen Listeners.
+class WebSocketTransport implements MessageTransport {
+  final WebSocket _socket;
+  late final StreamSubscription<dynamic> _socketSubscription;
+  final _linesController = StreamController<String>.broadcast();
+
+  WebSocketTransport(this._socket) {
+    _socketSubscription = _socket.listen(
+      (data) => _linesController.add(data as String),
+      onDone: _linesController.close,
+      onError: _linesController.addError,
+    );
+  }
+
+  @override
+  Stream<String> get lines => _linesController.stream;
+
+  @override
+  void send(String line) => _socket.add(line);
+
+  @override
+  Future<void> close() async {
+    await _socketSubscription.cancel();
+    await _socket.close();
+    await _linesController.close();
+  }
+}

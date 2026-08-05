@@ -74,6 +74,10 @@ Die genaue Arbeitsweise ist in [docs/branching/README.md](docs/branching/README.
 
 Siehe [docs/platform_release_checklist.md](docs/platform_release_checklist.md) für den aktuellen Stand pro Plattform.
 
+## Internet-Server
+
+Internet-Partien laufen über einen dedizierten, dauerhaft laufenden Server (`packages/qwirkle_server`), der auf einem VPS als Docker-Container betrieben wird. Einmaliges Setup: [docs/vps_deploy_setup.md](docs/vps_deploy_setup.md); danach aktualisiert `.github/workflows/deploy-server.yml` ihn automatisch bei jedem Release.
+
 ## Installation (fertige Builds)
 
 Fertige Builds für macOS, Linux und Windows gibt es unter [GitHub Releases](https://github.com/D-A-W-N/qwirkel-digital/releases) — jeweils als Zip/Tar.gz, kein Installer.

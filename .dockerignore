@@ -1,0 +1,17 @@
+# Nur packages/qwirkle_core, packages/qwirkle_net und packages/qwirkle_server
+# werden für das qwirkle_server-Image gebraucht (siehe
+# packages/qwirkle_server/Dockerfile) - alles andere bläht nur den Build-
+# Kontext auf.
+.git/
+.github/
+.claude/
+.vscode/
+.venv/
+docs/
+app/
+
+**/build/
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+*.log
