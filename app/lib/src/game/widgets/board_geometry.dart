@@ -13,10 +13,15 @@ class BoardGeometry {
 
   final double cellSize;
 
-  /// Fester Versatz in Zellen, groß genug für jedes realistische
-  /// Spielbrett (108 Steine ergeben rechnerisch höchstens eine Diagonale
-  /// von ca. 108 Zellen, selbst als lange T-/L-Schlange).
-  static const int origin = 500;
+  /// Fester Versatz in Zellen - großzügig über jedes realistische
+  /// Spielbrett hinaus (ein vollständiger Satz hat 108 Steine; selbst eine
+  /// durchgehende T-/L-Schlange käme rechnerisch kaum über ~108 Zellen in
+  /// einer Achse hinaus), aber bewusst NICHT beliebig groß gewählt: der
+  /// gesamte Koordinatenraum ist gleichzeitig der ohne Einschränkung
+  /// pan-bare Bereich von [CenteredBoardViewport] - zu großzügig bemessen
+  /// ließe sich weit in komplett leeren, ungezeichneten Bereich scrollen
+  /// (wirkt dann wie ein verschwundenes Brett).
+  static const int origin = 150;
 
   double pixelX(int worldX) => (worldX + origin) * cellSize;
   double pixelY(int worldY) => (worldY + origin) * cellSize;
