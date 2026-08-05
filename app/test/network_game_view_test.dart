@@ -32,6 +32,39 @@ void main() {
     expect(find.text('Spiel wird synchronisiert'), findsOneWidget);
   });
 
+  testWidgets(
+    'Die Statuszeile nennt beim Warten den Namen der Person, die am Zug ist, '
+    'statt einer separaten "Aktueller Zug"-Zeile',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.currentPlayerIndex = 1;
+      final snapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = snapshot.players[0].hand ?? <Tile>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshot,
+            ownHand: hand,
+            canInteract: false,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('Warte auf Bob.'), findsOneWidget);
+      // Die vormals separate, jetzt redundante Zeile gibt es nicht mehr.
+      expect(find.textContaining('Aktueller Zug'), findsNothing);
+    },
+  );
+
   testWidgets('NetworkGameView zeigt einen Spielende-Dialog mit Gewinnern an', (
     tester,
   ) async {
