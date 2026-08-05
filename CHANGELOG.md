@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-05
+
+- Replaced Internet-Mehrspieler's WebRTC/P2P approach (which required the host to be reachable from outside, i.e. port forwarding, and had no TURN fallback) with a dedicated, always-on backend server (`packages/qwirkle_server`) run on a VPS via Coolify and auto-deployed via GitHub Actions on release tags: players only ever make outbound connections to the server, disconnected players' seats wait to be reclaimed via a reconnect token instead of being auto-skipped, and rooms are persisted to disk so a server redeploy or a days-long pause never loses a running game. LAN play is unaffected.
+
 ## [0.8.0] - 2026-08-03
 
 - Changed scoring house rule: each newly placed tile in a turn now scores individually based on the line length at the moment it's placed (e.g. 3 tiles extending a line score 1+2+3, not just the final line length) — previously a multi-tile turn scored once per completed line, matching official Qwirkle rules; also added a second, explicit "points this turn vs. total after confirming" line to the in-progress-move status text to avoid confusing the two

@@ -1,0 +1,17 @@
+name: qwirkle_server
+description: Dedizierter, dauerhaft laufender Internet-Spiel-Server für Qwirkle-Digital (RoomManager aus qwirkle_net über WebSocket, mit Persistenz auf Platte).
+version: 1.0.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  qwirkle_core:
+    path: ../qwirkle_core
+  qwirkle_net:
+    path: ../qwirkle_net
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
+import 'internet_room_history.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
-import 'webrtc_transport.dart';
 
 class NetworkGameScreen extends StatefulWidget {
   const NetworkGameScreen({super.key, required this.config});
@@ -21,10 +21,6 @@ class NetworkGameScreen extends StatefulWidget {
 class _NetworkGameScreenState extends State<NetworkGameScreen> {
   HostSession? _hostSession;
   ClientSession? _clientSession;
-  SignalingServer? _signalingServer;
-  SignalingClient? _signalingClient;
-  StreamSubscription<PeerJoinedMessage>? _peerJoinedSubscription;
-  final List<WebRtcConnection> _webrtcConnections = [];
   String? _inviteCode;
   List<String> _localAddresses = const [];
   String? _status;
@@ -35,6 +31,13 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   List<Tile> _ownHand = const [];
 
   bool get _isLan => widget.config.mode == 'lan';
+
+  /// Ob diese Seite die Steuerung zum Starten/Neustarten der Partie zeigen
+  /// soll: im LAN-Modus der eingebettete Host, im Internet-Modus die
+  /// Person, die den Raum erstellt hat (`ClientSession.isRoomOwner`, vom
+  /// Server bestätigt).
+  bool get _hasOwnerControls =>
+      _hostSession != null || (_clientSession?.isRoomOwner ?? false);
 
   @override
   void initState() {
@@ -52,7 +55,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         setState(() {
           _status = _isLan
               ? 'Host wird gestartet...'
-              : 'Internet-Host wird vorbereitet...';
+              : 'Internet-Raum wird erstellt...';
         });
         await _startHosting();
       } else {
@@ -76,35 +79,49 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   }
 
   Future<void> _startHosting() async {
-    final host = HostSession(hostPlayerName: widget.config.effectiveName);
-    _wireHostListeners(host);
-    final addresses = await _detectLocalAddresses();
-    if (mounted) {
-      setState(() => _localAddresses = addresses);
-    }
-
     if (_isLan) {
+      final host = HostSession(hostPlayerName: widget.config.effectiveName);
+      _wireHostListeners(host);
+      final addresses = await _detectLocalAddresses();
+      if (mounted) {
+        setState(() => _localAddresses = addresses);
+      }
       await host.start(address: '0.0.0.0', port: widget.config.effectivePort);
-    } else {
-      await _startInternetSignaling(host);
+      _hostSession = host;
+      final initialSnapshot = host.snapshotForHost();
+      if (mounted && initialSnapshot != null) {
+        setState(() {
+          _snapshot = initialSnapshot;
+          _ownHand = initialSnapshot.players[initialSnapshot.yourPlayerIndex].hand ?? const <Tile>[];
+          _status = 'Host-Zustand aktualisiert';
+        });
+      }
+      if (!mounted) return;
+      setState(() {
+        _status = 'Host läuft auf Port ${host.port}';
+        _lobbyPlayers = host.lobbyPlayers;
+        _gameStarted = false;
+      });
+      return;
     }
 
-    _hostSession = host;
-    final initialSnapshot = host.snapshotForHost();
-    if (mounted && initialSnapshot != null) {
-      setState(() {
-        _snapshot = initialSnapshot;
-        _ownHand = initialSnapshot.players[initialSnapshot.yourPlayerIndex].hand ?? const <Tile>[];
-        _status = 'Host-Zustand aktualisiert';
-      });
-    }
+    // Internet: kein eigener lokaler Server mehr - der Ersteller ist genau
+    // wie jede:r Mitspieler:in ein Client des dedizierten `qwirkle_server`-
+    // Backends, bekommt vom Server aber die Owner-Rechte (siehe
+    // `ClientSession.isRoomOwner`) für Start/Neustart der Partie.
+    final session = ClientSession();
+    _wireClientListeners(session);
+    final socket = await WebSocket.connect(widget.config.effectiveServerUrl);
+    await session.connectVia(
+      WebSocketTransport(socket),
+      name: widget.config.effectiveName,
+    );
+    await _rememberSession(session);
+    _afterClientConnected(session);
     if (!mounted) return;
     setState(() {
-      _status = _isLan
-          ? 'Host läuft auf Port ${host.port}'
-          : 'Host läuft – Einladungscode: $_inviteCode';
-      _lobbyPlayers = host.lobbyPlayers;
-      _gameStarted = false;
+      _inviteCode = session.roomCode;
+      _status = 'Raum erstellt – Einladungscode: ${session.roomCode}';
     });
   }
 
@@ -161,43 +178,6 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     }
   }
 
-  /// Startet einen eigenen [SignalingServer] und verbindet einen
-  /// [SignalingClient] gegen die eigene Adresse, um einen Raum zu erstellen.
-  /// Die erreichbare Signaling-URL muss der Host selbst mit den Mitspieler:
-  /// innen teilen (z. B. per Chat) — für echte Verbindungen über getrennte
-  /// Netzwerke hinweg muss diese Adresse von außen erreichbar sein
-  /// (Portweiterleitung, oder ein selbst betriebener öffentlicher
-  /// Signaling-Server statt `localhost`).
-  Future<void> _startInternetSignaling(HostSession host) async {
-    final server = SignalingServer();
-    await server.start(address: '0.0.0.0', port: 0);
-    _signalingServer = server;
-
-    final client = SignalingClient();
-    await client.connect('ws://127.0.0.1:${server.port}');
-    _signalingClient = client;
-
-    final code = await client.createRoom();
-    if (mounted) {
-      setState(() => _inviteCode = code);
-    }
-
-    _peerJoinedSubscription = client.peerJoined.listen((event) async {
-      try {
-        final connection = WebRtcConnection(
-          signaling: client,
-          remotePeerId: event.peerId,
-        );
-        _webrtcConnections.add(connection);
-        final transport = await connection.connectAsOfferer();
-        host.acceptTransport(transport);
-      } catch (error) {
-        if (!mounted) return;
-        setState(() => _status = 'Verbindungsaufbau fehlgeschlagen: $error');
-      }
-    });
-  }
-
   Future<void> _joinSession() async {
     if (_isLan) {
       await _joinLan();
@@ -218,30 +198,41 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   }
 
   Future<void> _joinInternet() async {
-    final client = SignalingClient();
-    await client.connect(widget.config.signalingUrl);
-    _signalingClient = client;
-
-    final existingPeerIds = await client.joinRoom(widget.config.inviteCode);
-    if (existingPeerIds.isEmpty) {
-      throw StateError('Kein Host im Raum gefunden.');
-    }
-    final hostPeerId = existingPeerIds.first;
-
-    final connection = WebRtcConnection(
-      signaling: client,
-      remotePeerId: hostPeerId,
-    );
-    _webrtcConnections.add(connection);
-    if (mounted) {
-      setState(() => _status = 'Verbinde mit dem Host (WebRTC)...');
-    }
-    final transport = await connection.connectAsAnswerer();
-
     final session = ClientSession();
     _wireClientListeners(session);
-    await session.connectVia(transport, name: widget.config.effectiveName);
+    if (mounted) {
+      setState(() => _status = 'Verbinde mit dem Raum...');
+    }
+    final socket = await WebSocket.connect(widget.config.effectiveServerUrl);
+    // Ein zuvor gespeichertes Reconnect-Token (falls für diesen Raum
+    // vorhanden) fordert denselben Sitzplatz zurück, statt einen neuen zu
+    // beziehen - wichtig, wenn die Partie schon läuft.
+    final history = await loadInternetRoomHistory();
+    final saved = history.where((e) => e.roomCode == widget.config.inviteCode);
+    await session.connectVia(
+      WebSocketTransport(socket),
+      name: widget.config.effectiveName,
+      roomCode: widget.config.inviteCode,
+      reconnectToken: saved.isEmpty ? null : saved.first.reconnectToken,
+    );
+    await _rememberSession(session);
     _afterClientConnected(session);
+    if (!mounted) return;
+    setState(() => _inviteCode = session.roomCode);
+  }
+
+  Future<void> _rememberSession(ClientSession session) async {
+    final roomCode = session.roomCode;
+    final token = session.reconnectToken;
+    if (roomCode == null || token == null) return;
+    await rememberInternetRoom(
+      InternetRoomEntry(
+        roomCode: roomCode,
+        playerName: widget.config.effectiveName,
+        reconnectToken: token,
+        lastSeen: DateTime.now(),
+      ),
+    );
   }
 
   void _wireClientListeners(ClientSession session) {
@@ -280,6 +271,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         setState(() {
           _snapshot = snapshot;
           _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+          _gameStarted = true;
         });
       }
     }
@@ -290,46 +282,51 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   void dispose() {
     unawaited(_hostSession?.close());
     unawaited(_clientSession?.close());
-    unawaited(_peerJoinedSubscription?.cancel());
-    for (final connection in _webrtcConnections) {
-      unawaited(connection.close());
-    }
-    unawaited(_signalingClient?.close());
-    unawaited(_signalingServer?.close());
     super.dispose();
   }
 
   Future<void> _startGame() async {
-    if (_hostSession == null || _gameStarted) return;
-    setState(() => _status = 'Spiel wird gestartet...');
-    _hostSession!.startGame();
-    final snapshot = _hostSession!.snapshotForHost();
-    if (!mounted || snapshot == null) return;
-    setState(() {
-      _snapshot = snapshot;
-      _gameStarted = true;
-      _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
-      _status = 'Spiel gestartet';
-    });
+    if (_gameStarted) return;
+    if (_hostSession != null) {
+      setState(() => _status = 'Spiel wird gestartet...');
+      _hostSession!.startGame();
+      final snapshot = _hostSession!.snapshotForHost();
+      if (!mounted || snapshot == null) return;
+      setState(() {
+        _snapshot = snapshot;
+        _gameStarted = true;
+        _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+        _status = 'Spiel gestartet';
+      });
+    } else if (_hasOwnerControls) {
+      setState(() => _status = 'Spiel wird gestartet...');
+      _clientSession!.sendStartGame();
+      // Der Zustand kommt asynchron über `stateUpdates` zurück (der Server
+      // verteilt ihn an alle Sitzplätze, auch den eigenen).
+    }
   }
 
   Future<void> _restartGame() async {
-    if (_hostSession == null) return;
-    setState(() {
-      _gameStarted = false;
-      _snapshot = null;
-      _ownHand = const <Tile>[];
-      _status = 'Neue Partie wird vorbereitet...';
-    });
-    _hostSession!.restartGame();
-    final snapshot = _hostSession!.snapshotForHost();
-    if (!mounted || snapshot == null) return;
-    setState(() {
-      _snapshot = snapshot;
-      _gameStarted = true;
-      _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
-      _status = 'Neue Partie gestartet';
-    });
+    if (_hostSession != null) {
+      setState(() {
+        _gameStarted = false;
+        _snapshot = null;
+        _ownHand = const <Tile>[];
+        _status = 'Neue Partie wird vorbereitet...';
+      });
+      _hostSession!.restartGame();
+      final snapshot = _hostSession!.snapshotForHost();
+      if (!mounted || snapshot == null) return;
+      setState(() {
+        _snapshot = snapshot;
+        _gameStarted = true;
+        _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+        _status = 'Neue Partie gestartet';
+      });
+    } else if (_hasOwnerControls) {
+      setState(() => _status = 'Neue Partie wird vorbereitet...');
+      _clientSession!.sendRestartGame();
+    }
   }
 
   /// Sendet [placements] und meldet zurück, ob der Zug angenommen wurde.
@@ -365,7 +362,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       );
     }
 
-    final isHosting = _hostSession != null;
+    final isHosting = _hostSession != null || widget.config.isHosting;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Netzwerk-Spiel')),
@@ -384,32 +381,18 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
             if (_isInitializing)
               const Center(child: CircularProgressIndicator())
             else ...[
-              if (isHosting && _localAddresses.isNotEmpty) ...[
+              if (_isLan && isHosting && _localAddresses.isNotEmpty) ...[
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.router),
-                    title: Text(
-                      _isLan ? 'Erreichbar unter' : 'Signaling-URL',
-                    ),
+                    title: const Text('Erreichbar unter'),
                     subtitle: SelectableText(
-                      _isLan
-                          ? _localAddresses
-                              .map((address) => '$address:${_hostSession?.port ?? widget.config.effectivePort}')
-                              .join(' oder ')
-                          : _localAddresses
-                              .map((address) => 'ws://$address:${_signalingServer?.port ?? ''}')
-                              .join(' oder '),
+                      _localAddresses
+                          .map((address) => '$address:${_hostSession?.port ?? widget.config.effectivePort}')
+                          .join(' oder '),
                     ),
                   ),
                 ),
-                if (!_isLan)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4, bottom: 4),
-                    child: Text(
-                      'Nur im selben Netzwerk direkt erreichbar. Für echte Internet-Partien muss diese Adresse von außen erreichbar sein (z. B. Portweiterleitung) oder ein extern gehosteter Signaling-Server verwendet werden.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
                 const SizedBox(height: 12),
               ],
               if (_inviteCode != null) ...[
@@ -429,11 +412,11 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                   subtitle: Text(
                     isHosting
                         ? (_gameStarted || _snapshot != null
-                            ? 'HostSession läuft und das Spiel ist aktiv.'
-                            : 'HostSession ist gestartet und erwartet Mitspieler.')
+                            ? 'Die Partie ist aktiv.'
+                            : 'Wartet auf Mitspieler:innen.')
                         : (_gameStarted || _snapshot != null
                             ? 'Spiel läuft bereits – der aktuelle Stand wird angezeigt.'
-                            : 'ClientSession ist verbunden und wartet auf Updates.'),
+                            : 'Verbunden und wartet auf Updates.'),
                   ),
                 ),
               ),
@@ -452,8 +435,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                             ? 'Spiel läuft bereits'
                             : 'Warte auf den Spielstart...')
                       : (_gameStarted || _snapshot != null
-                            ? 'Spiel gestartet – der Host hat die Partie begonnen.'
-                            : 'Warte auf den Host – die Partie hat noch nicht begonnen.'),
+                            ? 'Spiel gestartet – die Partie hat begonnen.'
+                            : 'Warte auf den Spielstart...'),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
@@ -469,7 +452,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
               ],
             ],
             const Spacer(),
-            if (isHosting && !_gameStarted) ...[
+            if (_hasOwnerControls && !_gameStarted) ...[
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -480,7 +463,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            if (isHosting && _gameStarted && _snapshot != null && _snapshot!.isOver) ...[
+            if (_hasOwnerControls && _gameStarted && _snapshot != null && _snapshot!.isOver) ...[
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(

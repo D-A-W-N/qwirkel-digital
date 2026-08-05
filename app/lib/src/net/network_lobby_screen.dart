@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/app_settings.dart';
+import 'internet_room_history.dart';
 import 'network_connection_config.dart';
 import 'network_game_screen.dart';
 
@@ -17,10 +18,11 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
   final _portController = TextEditingController(text: '4040');
   final _nameController = TextEditingController(text: 'Spieler');
   String? _errorText;
-  final _signalingUrlController = TextEditingController();
+  final _serverUrlController = TextEditingController(text: kDefaultInternetServerUrl);
   final _inviteCodeController = TextEditingController();
   bool _isHosting = false;
   String _connectionMode = 'lan';
+  List<InternetRoomEntry> _recentRooms = const [];
   final List<String> _tips = [
     'Hoste ein Spiel, wenn du die Partie starten willst.',
     'Wähle einen eindeutigen Namen, damit andere dich sofort erkennen.',
@@ -28,11 +30,23 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadRecentRooms();
+  }
+
+  Future<void> _loadRecentRooms() async {
+    final entries = await loadInternetRoomHistory();
+    if (!mounted) return;
+    setState(() => _recentRooms = entries);
+  }
+
+  @override
   void dispose() {
     _hostController.dispose();
     _portController.dispose();
     _nameController.dispose();
-    _signalingUrlController.dispose();
+    _serverUrlController.dispose();
     _inviteCodeController.dispose();
     super.dispose();
   }
@@ -63,8 +77,8 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
               title: Text(_isHosting ? 'Hosting-Modus' : 'Beitritts-Modus'),
               subtitle: Text(
                 _isHosting
-                    ? 'Der Host wartet auf Mitspieler und startet das Spiel.'
-                    : 'Du verbindest dich zu einem Host.',
+                    ? 'Du erstellst die Partie und startest sie, sobald alle da sind.'
+                    : 'Du verbindest dich mit einer bestehenden Partie.',
               ),
               value: _isHosting,
               onChanged: (value) => setState(() => _isHosting = value),
@@ -118,23 +132,19 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                 ),
               ),
             ] else ...[
+              TextField(
+                controller: _serverUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'Server-Adresse',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
               if (_isHosting)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Signaling-URL und Einladungscode werden nach dem Start angezeigt und können dann geteilt werden.',
-                  ),
+                const Text(
+                  'Der Einladungscode wird nach dem Erstellen des Raums angezeigt und kann dann geteilt werden.',
                 )
               else ...[
-                TextField(
-                  controller: _signalingUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'Signaling-URL',
-                    hintText: 'z. B. ws://192.168.1.23:54321',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: _inviteCodeController,
                   decoration: const InputDecoration(
@@ -142,6 +152,37 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                if (_recentRooms.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Zuletzt besuchte Räume',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Partien können sich über mehrere Tage ziehen - hier geht es direkt zurück in einen bereits besuchten Raum.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  ..._recentRooms.map(
+                    (entry) => Card(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      child: ListTile(
+                        leading: const Icon(Icons.history),
+                        title: Text(entry.roomCode),
+                        subtitle: Text(
+                          'als ${entry.playerName} · zuletzt ${_formatLastSeen(entry.lastSeen)}',
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _inviteCodeController.text = entry.roomCode;
+                            _nameController.text = entry.playerName;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ],
             const SizedBox(height: 16),
@@ -182,7 +223,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                     host: _hostController.text,
                     port: _portController.text,
                     name: _nameController.text,
-                    signalingUrl: _signalingUrlController.text,
+                    serverUrl: _serverUrlController.text,
                     inviteCode: _inviteCodeController.text,
                   );
                   setState(() => _errorText = null);
@@ -221,4 +262,12 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
       ),
     );
   }
+}
+
+String _formatLastSeen(DateTime lastSeen) {
+  final diff = DateTime.now().difference(lastSeen);
+  if (diff.inMinutes < 1) return 'gerade eben';
+  if (diff.inHours < 1) return 'vor ${diff.inMinutes} Min.';
+  if (diff.inDays < 1) return 'vor ${diff.inHours} Std.';
+  return 'vor ${diff.inDays} Tag${diff.inDays == 1 ? '' : 'en'}';
 }

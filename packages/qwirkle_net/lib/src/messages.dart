@@ -19,35 +19,109 @@ abstract class NetMessage {
 }
 
 /// Client -> Host: Beitrittswunsch mit gewünschtem Anzeigenamen.
+///
+/// [roomCode]/[reconnectToken] werden nur vom `qwirkle_server`-Backend
+/// genutzt (mehrere Räume auf einem Port) - `HostSession` (LAN, ein Prozess
+/// = eine Partie) ignoriert sie. `roomCode == null` bedeutet dort "neuen Raum
+/// erstellen", ein gesetzter [reconnectToken] fordert die Rückgabe eines
+/// zuvor verlassenen Sitzplatzes an, statt einen neuen zu vergeben.
 class JoinMessage extends NetMessage {
   final String name;
+  final String? roomCode;
+  final String? reconnectToken;
 
-  JoinMessage(this.name);
+  JoinMessage(this.name, {this.roomCode, this.reconnectToken});
 
   @override
   String get type => 'join';
 
   @override
-  Map<String, dynamic> toJson() => {'name': name};
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    if (roomCode != null) 'roomCode': roomCode,
+    if (reconnectToken != null) 'reconnectToken': reconnectToken,
+  };
 
-  factory JoinMessage.fromJson(Map<String, dynamic> json) =>
-      JoinMessage(json['name'] as String);
+  factory JoinMessage.fromJson(Map<String, dynamic> json) => JoinMessage(
+    json['name'] as String,
+    roomCode: json['roomCode'] as String?,
+    reconnectToken: json['reconnectToken'] as String?,
+  );
 }
 
-/// Host -> Client: Bestätigt die Verbindung und weist eine Spieler-Identität zu.
+/// Host -> Client: Bestätigt die Verbindung und weist eine Spieler-Identität
+/// zu. Im `qwirkle_server`-Backend zusätzlich mit dem (neu oder wieder
+/// vergebenen) Einladungscode des Raums sowie einem Reconnect-Token, das der
+/// Client lokal speichert, um nach einer Trennung denselben Sitzplatz per
+/// [JoinMessage.reconnectToken] zurückzufordern.
 class WelcomeMessage extends NetMessage {
   final String playerId;
+  final String? roomCode;
+  final String? reconnectToken;
 
-  WelcomeMessage(this.playerId);
+  /// Nur `qwirkle_server`-Backend: ob dieser Sitzplatz die Owner-Rechte hat
+  /// (`StartGameMessage`/`RestartGameMessage` senden darf). Vom Server
+  /// bestätigt statt vom Client selbst hergeleitet, damit auch ein
+  /// reconnectender Owner seine Rolle zuverlässig zurückbekommt.
+  final bool isOwner;
+
+  WelcomeMessage(
+    this.playerId, {
+    this.roomCode,
+    this.reconnectToken,
+    this.isOwner = false,
+  });
 
   @override
   String get type => 'welcome';
 
   @override
-  Map<String, dynamic> toJson() => {'playerId': playerId};
+  Map<String, dynamic> toJson() => {
+    'playerId': playerId,
+    if (roomCode != null) 'roomCode': roomCode,
+    if (reconnectToken != null) 'reconnectToken': reconnectToken,
+    if (isOwner) 'isOwner': isOwner,
+  };
 
   factory WelcomeMessage.fromJson(Map<String, dynamic> json) =>
-      WelcomeMessage(json['playerId'] as String);
+      WelcomeMessage(
+        json['playerId'] as String,
+        roomCode: json['roomCode'] as String?,
+        reconnectToken: json['reconnectToken'] as String?,
+        isOwner: json['isOwner'] as bool? ?? false,
+      );
+}
+
+/// Raumbesitzer:in -> Server: startet die Partie mit allen aktuell im Raum
+/// befindlichen Spieler:innen (`qwirkle_server`-Backend; entspricht
+/// `HostSession.startGame()`, das im LAN-Modus lokal statt über die
+/// Leitung aufgerufen wird).
+class StartGameMessage extends NetMessage {
+  StartGameMessage();
+
+  @override
+  String get type => 'startGame';
+
+  @override
+  Map<String, dynamic> toJson() => {};
+
+  factory StartGameMessage.fromJson(Map<String, dynamic> json) =>
+      StartGameMessage();
+}
+
+/// Raumbesitzer:in -> Server: startet die Partie mit denselben Teilnehmer:innen
+/// neu (`qwirkle_server`-Backend; entspricht `HostSession.restartGame()`).
+class RestartGameMessage extends NetMessage {
+  RestartGameMessage();
+
+  @override
+  String get type => 'restartGame';
+
+  @override
+  Map<String, dynamic> toJson() => {};
+
+  factory RestartGameMessage.fromJson(Map<String, dynamic> json) =>
+      RestartGameMessage();
 }
 
 /// Host -> alle Clients: aktuelle Warteliste vor Spielstart.
@@ -173,6 +247,10 @@ NetMessage decodeMessage(String line) {
       return ExchangeMessage.fromJson(json);
     case 'pass':
       return PassMessage.fromJson(json);
+    case 'startGame':
+      return StartGameMessage.fromJson(json);
+    case 'restartGame':
+      return RestartGameMessage.fromJson(json);
     case 'error':
       return ErrorMessage.fromJson(json);
     default:

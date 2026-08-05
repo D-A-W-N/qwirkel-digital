@@ -1,3 +1,8 @@
+/// Standard-Adresse des dedizierten Internet-Servers (`qwirkle_server` auf
+/// dem VPS) - siehe docs/vps_deploy_setup.md. Im Verbindungsbildschirm
+/// überschreibbar (z. B. für lokale Tests gegen `ws://localhost:8080`).
+const kDefaultInternetServerUrl = 'wss://qgames.streetkidz.duckdns.org';
+
 class NetworkConnectionConfig {
   NetworkConnectionConfig({
     required String mode,
@@ -5,13 +10,14 @@ class NetworkConnectionConfig {
     required String host,
     required String port,
     required String name,
-    required String signalingUrl,
+    required String serverUrl,
     required String inviteCode,
+    this.reconnectToken,
   }) : mode = mode.trim(),
        host = host.trim(),
        port = port.trim(),
        name = name.trim(),
-       signalingUrl = signalingUrl.trim(),
+       serverUrl = serverUrl.trim(),
        inviteCode = inviteCode.trim() {
     if (this.mode.isEmpty) {
       throw ArgumentError('Mode must not be empty');
@@ -28,12 +34,24 @@ class NetworkConnectionConfig {
   final String host;
   final String port;
   final String name;
-  final String signalingUrl;
+
+  /// Nur `mode == 'internet'`: Adresse des dedizierten Servers.
+  final String serverUrl;
+
+  /// Nur `mode == 'internet'`: Raum-Code, dem beigetreten werden soll
+  /// (leer beim Hosten - der Server vergibt dann einen neuen Code).
   final String inviteCode;
+
+  /// Nur `mode == 'internet'`: aus der lokalen Raum-Historie übernommenes
+  /// Reconnect-Token, um nach einer Trennung denselben Sitzplatz
+  /// zurückzufordern statt neu beizutreten (siehe `internet_room_history.dart`).
+  final String? reconnectToken;
 
   String get effectiveHost => host.trim();
 
   String get effectiveName => name.trim();
+
+  String get effectiveServerUrl => serverUrl.trim();
 
   int get effectivePort {
     final parsed = int.tryParse(port.trim());
