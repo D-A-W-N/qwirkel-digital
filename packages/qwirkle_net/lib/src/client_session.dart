@@ -24,6 +24,7 @@ class ClientSession {
   final _errorController = StreamController<String>.broadcast();
   final _welcomeController = StreamController<String>.broadcast();
   final _statusController = StreamController<String>.broadcast();
+  final _disconnectedController = StreamController<void>.broadcast();
 
   GameStateSnapshot? _latestSnapshot;
 
@@ -54,6 +55,13 @@ class ClientSession {
 
   Stream<String> get errors => _errorController.stream;
   Stream<String> get statusUpdates => _statusController.stream;
+
+  /// Feuert genau einmal, wenn der Transport ohne aktives [close] endet -
+  /// getrennt von [errors] (das auch von `ErrorMessage`s des Servers befeuert
+  /// wird), damit Aufrufer:innen gezielt auf "Verbindung verloren" reagieren
+  /// können (z. B. automatisch neu verbinden), ohne Fehlertexte parsen zu
+  /// müssen.
+  Stream<void> get disconnected => _disconnectedController.stream;
   GameStateSnapshot? get latestSnapshot => _latestSnapshot;
 
   /// Verbindet sich per TCP mit dem Host unter [host]:[port] und tritt mit
@@ -110,6 +118,7 @@ class ClientSession {
   void _handleDisconnect() {
     _errorController.add('Verbindung zum Host verloren.');
     _statusController.add('Verbindung zum Host verloren');
+    _disconnectedController.add(null);
   }
 
   void _handleLine(String line) {
@@ -165,5 +174,6 @@ class ClientSession {
     await _errorController.close();
     await _welcomeController.close();
     await _statusController.close();
+    await _disconnectedController.close();
   }
 }

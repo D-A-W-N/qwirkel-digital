@@ -36,6 +36,14 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   /// würde) - siehe Nutzer-Feedback "Fehler besser visualisieren".
   String? _errorText;
 
+  /// Ob gerade automatisch versucht wird, eine verlorene Internet-
+  /// Verbindung wiederherzustellen (z. B. weil der `qwirkle_server` gerade
+  /// neu deployed wurde) - siehe Nutzer-Feedback: vorher blieb die Partie
+  /// beim Verbindungsverlust ohne jeden weiteren Versuch einfach stehen,
+  /// man musste manuell verlassen und neu beitreten. Blockt währenddessen
+  /// das Senden von Zügen (die sonst ins Leere gingen).
+  bool _reconnecting = false;
+
   bool get _isLan => widget.config.mode == 'lan';
 
   /// Ob diese Seite die Steuerung zum Starten/Neustarten der Partie zeigen
@@ -276,6 +284,78 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       if (!mounted) return;
       setState(() => _errorText = message);
     });
+    // Nur im Internet-Modus automatisch neu verbinden: LAN hat keinen
+    // dauerhaften Server/kein Reconnect-Token-System, ein getrennter
+    // direkter TCP-Host ist i. d. R. tatsächlich weg. `_inviteCode == null`
+    // heißt, die Verbindung riss ab, bevor überhaupt ein Raum-Code bekannt
+    // wurde (z. B. mitten im allerersten Handshake) - dafür gibt es nichts,
+    // womit sich sinnvoll neu verbinden ließe, das würde sonst für immer
+    // erfolglos wiederholen.
+    if (!_isLan) {
+      session.disconnected.listen((_) {
+        if (_inviteCode != null) unawaited(_attemptReconnect());
+      });
+    }
+  }
+
+  /// Versucht wiederholt (mit wachsendem Abstand), nach einem Verbindungs-
+  /// verlust denselben Raum-Sitzplatz zurückzuerobern - siehe [_reconnecting]
+  /// für den Hintergrund. Gibt nie endgültig auf (ein Deploy kann je nach
+  /// Situation unterschiedlich lange dauern); die Person kann die Partie
+  /// jederzeit über "Zurück zur Lobby" verlassen, falls gewünscht.
+  Future<void> _attemptReconnect() async {
+    if (_reconnecting || !mounted) return;
+    setState(() {
+      _reconnecting = true;
+      _errorText = 'Verbindung verloren – versuche erneut zu verbinden…';
+    });
+    var attempt = 0;
+    while (mounted && _reconnecting) {
+      attempt += 1;
+      try {
+        await _reconnectInternet();
+        if (!mounted) return;
+        setState(() {
+          _reconnecting = false;
+          _errorText = null;
+          _status = 'Wieder verbunden';
+        });
+        return;
+      } catch (_) {
+        if (!mounted) return;
+        final delaySeconds = attempt * 2 > 15 ? 15 : attempt * 2;
+        setState(
+          () => _errorText =
+              'Verbindung verloren – nächster Versuch in ${delaySeconds}s…',
+        );
+        await Future.delayed(Duration(seconds: delaySeconds));
+      }
+    }
+  }
+
+  /// Baut die Internet-Verbindung mit demselben Raum-Code + dem lokal
+  /// gespeicherten Reconnect-Token neu auf (derselbe Ablauf wie beim
+  /// manuellen Beitreten über die Lobby, siehe [_joinInternet] - hier nur
+  /// über [_inviteCode] statt `widget.config.inviteCode`, da auch die
+  /// Person, die den Raum ursprünglich erstellt hat, den vom Server
+  /// zugewiesenen Code erst nach dem Verbinden kennt).
+  Future<void> _reconnectInternet() async {
+    final roomCode = _inviteCode;
+    if (roomCode == null) throw StateError('Kein Raum-Code bekannt.');
+    final session = ClientSession();
+    _wireClientListeners(session);
+    final socket = await WebSocket.connect(widget.config.effectiveServerUrl);
+    final history = await loadInternetRoomHistory();
+    final saved = history.where((e) => e.roomCode == roomCode);
+    await session.connectVia(
+      WebSocketTransport(socket),
+      name: widget.config.effectiveName,
+      roomCode: roomCode,
+      reconnectToken: saved.isEmpty ? null : saved.first.reconnectToken,
+    );
+    await _rememberSession(session, isOver: session.latestSnapshot?.isOver ?? false);
+    unawaited(_clientSession?.close());
+    _afterClientConnected(session);
   }
 
   void _afterClientConnected(ClientSession session) {
@@ -421,7 +501,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         // ist.
         canInteract:
             _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex &&
-                !_snapshot!.isOver,
+                !_snapshot!.isOver &&
+                !_reconnecting,
         onSendMove: _sendMove,
         onSendPass: _sendPass,
         onSendExchange: _sendExchange,
