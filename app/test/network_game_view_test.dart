@@ -21,6 +21,8 @@ void main() {
           canInteract: true,
           statusText: 'Spiel wird synchronisiert',
           onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
         ),
       ),
     );
@@ -48,6 +50,8 @@ void main() {
           ownHand: hand,
           canInteract: false,
           onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
         ),
       ),
     );
@@ -72,6 +76,8 @@ void main() {
           ownHand: hand,
           canInteract: true,
           onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
         ),
       ),
     );
@@ -108,6 +114,8 @@ void main() {
             expect(placements, isNotEmpty);
             return true;
           },
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
         ),
       ),
     );
@@ -159,6 +167,8 @@ void main() {
             ownHand: hand,
             canInteract: true,
             onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
           ),
         ),
       );
@@ -207,6 +217,8 @@ void main() {
           ownHand: hand,
           canInteract: true,
           onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
           errorText: errorText,
         ),
       );
@@ -237,6 +249,99 @@ void main() {
 
       expect(find.text('Server lehnt den Zug ab'), findsOneWidget);
       expect(find.text('Zug senden'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Aussetzen ist nur möglich, wenn der Beutel leer ist',
+    (tester) async {
+      final gameWithFullBag = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      gameWithFullBag.currentPlayerIndex = 0;
+      final snapshotWithFullBag = GameStateSnapshot.forRecipient(gameWithFullBag, 0);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshotWithFullBag,
+            ownHand: snapshotWithFullBag.players[0].hand ?? <Tile>[],
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+          ),
+        ),
+      );
+      expect(find.text('Aussetzen'), findsNothing);
+
+      final gameWithEmptyBag = QwirkleGame(
+        players: [Player(id: 'p1', name: 'Alice'), Player(id: 'p2', name: 'Bob')],
+        bag: TileBag.fromTiles(const []),
+      );
+      gameWithEmptyBag.currentPlayerIndex = 0;
+      final snapshotWithEmptyBag = GameStateSnapshot.forRecipient(gameWithEmptyBag, 0);
+
+      var passed = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshotWithEmptyBag,
+            ownHand: snapshotWithEmptyBag.players[0].hand ?? <Tile>[],
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () => passed = true,
+            onSendExchange: (tiles) {},
+          ),
+        ),
+      );
+
+      expect(find.text('Aussetzen'), findsOneWidget);
+      await tester.tap(find.text('Aussetzen'));
+      expect(passed, isTrue);
+    },
+  );
+
+  testWidgets(
+    'Im Tausch-Modus ausgewählte Steine werden getauscht',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.currentPlayerIndex = 0;
+      final snapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = snapshot.players[0].hand ?? <Tile>[];
+
+      List<Tile>? exchangedTiles;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshot,
+            ownHand: hand,
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) => exchangedTiles = tiles,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pump();
+
+      await tester.tap(find.text('Steine tauschen…'));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('hand-0')));
+      await tester.pump();
+      await tester.tap(find.text('Steine tauschen'));
+      await tester.pump();
+
+      expect(exchangedTiles, [hand[0]]);
+      // Der Tausch-Modus wird nach dem Bestätigen wieder verlassen.
+      expect(find.text('Steine tauschen…'), findsOneWidget);
     },
   );
 }
