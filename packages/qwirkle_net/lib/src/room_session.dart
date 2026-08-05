@@ -192,6 +192,14 @@ class RoomSession {
       seat.send(ErrorMessage(e.message));
     } on ArgumentError catch (e) {
       seat.send(ErrorMessage(e.message.toString()));
+    } catch (e) {
+      // Kein spezifischer, erwarteter Fehlertyp - trotzdem antworten statt
+      // die Nachricht stillschweigend zu verschlucken. Ohne das bleibt der
+      // Client ohne jede Rückmeldung hängen: seine vorläufige Platzierung
+      // ist bereits lokal geräumt (der Client geht optimistisch von Erfolg
+      // aus), aber ohne neuen Spielstand ODER Fehlermeldung sieht es aus,
+      // als wären die Steine kommentarlos verschwunden.
+      seat.send(ErrorMessage('Unerwarteter Fehler: $e'));
     }
   }
 
