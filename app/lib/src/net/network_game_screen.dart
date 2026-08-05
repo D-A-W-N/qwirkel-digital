@@ -401,10 +401,20 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       return NetworkGameView(
         snapshot: _snapshot!,
         ownHand: _ownHand,
-        canInteract: _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex,
+        // `!isOver` ist nötig: `currentPlayerIndex` wechselt NICHT mehr,
+        // sobald genau dieser Zug die Partie beendet (siehe
+        // `QwirkleGame._advanceTurn`) - ohne die Zusatzbedingung bliebe die
+        // Person, die den letzten Zug gemacht hat, weiter interaktionsfähig
+        // (Zug senden/Zurücknehmen/Tauschen), obwohl die Partie schon vorbei
+        // ist.
+        canInteract:
+            _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex &&
+                !_snapshot!.isOver,
         onSendMove: _sendMove,
         onSendPass: _sendPass,
         onSendExchange: _sendExchange,
+        isRoomOwner: _hasOwnerControls,
+        onRestartGame: _restartGame,
         statusText: _status,
         errorText: _errorText,
       );
@@ -507,17 +517,6 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                   onPressed: _startGame,
                   icon: const Icon(Icons.play_arrow),
                   label: const Text('Spiel starten'),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (_hasOwnerControls && _gameStarted && _snapshot != null && _snapshot!.isOver) ...[
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _restartGame,
-                  icon: const Icon(Icons.restart_alt),
-                  label: const Text('Neues Spiel'),
                 ),
               ),
               const SizedBox(height: 12),
