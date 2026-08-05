@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-08-05
+
+- The board now gets the full screen by default in both local and network play - hand/buttons/status live in a new collapsible bottom panel instead of a fixed block, reclaiming most of the screen for players using large system text/zoom. The panel auto-expands whenever it becomes your turn and is always manually toggleable (tap or drag the handle)
+
 ## [0.9.12] - 2026-08-05
 
 - Local and network play now share the same board, hand, score and status-banner widgets instead of parallel, drifting implementations - network play's chrome is noticeably leaner as a result (one redundant status line/banner removed), and the waiting status now names who you're waiting for
