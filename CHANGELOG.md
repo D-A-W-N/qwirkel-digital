@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-08-06
+
+- Fixed the settings sheet not being fully visible/scrollable at large system text scale, which made the update controls unreachable
+
 ## [0.9.16] - 2026-08-05
 
 - Replaced the collapsible bottom panel from 0.9.13 with a fixed, always-visible bar - the collapse/expand toggle never actually helped in practice (nothing worth hiding while waiting, forced open on your own turn anyway to reach the hand)
