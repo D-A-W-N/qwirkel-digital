@@ -76,7 +76,7 @@ Siehe [docs/platform_release_checklist.md](docs/platform_release_checklist.md) f
 
 ## Internet-Server
 
-Internet-Partien laufen über einen dedizierten, dauerhaft laufenden Server (`packages/qwirkle_server`), der auf einem VPS als Docker-Container betrieben wird. Einmaliges Setup: [docs/vps_deploy_setup.md](docs/vps_deploy_setup.md); danach aktualisiert `.github/workflows/deploy-server.yml` ihn automatisch bei jedem Release.
+Internet-Partien laufen über einen dedizierten, dauerhaft laufenden Server (`packages/qwirkle_server`), der auf einem VPS über Coolify als Docker-Container betrieben wird. Einmaliges Setup: [docs/vps_deploy_setup.md](docs/vps_deploy_setup.md); danach deployed Coolifys eigenes Auto-Deploy-on-Push den Server automatisch bei jedem Merge nach `main`.
 
 ## Installation (fertige Builds)
 
