@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-05
+
+- Fixed the board appearing to vanish while scrolling (the fixed coordinate canvas from 0.9.4's jump fix was generously sized at 64000x64000px, almost entirely empty space around the actual play area - shrunk to a much less easy to get lost in ~19200x19200px)
+
 ## [0.9.4] - 2026-08-05
 
 - Fixed the board occasionally jumping mid-game on an unrelated tap (tile positions were recomputed relative to a dynamic bounding-box minimum that shifted whenever the board's extent changed - now uses a fixed coordinate origin)
