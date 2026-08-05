@@ -60,12 +60,26 @@ class GameServer {
     );
   }
 
-  /// Schließt den Listener und wartet, bis alle noch laufenden
-  /// Persistenz-Schreibvorgänge abgeschlossen sind - wichtig bei einem
-  /// Redeploy, damit ein neu startender Prozess nie mit einem noch aktiven
-  /// Schreibvorgang des alten Prozesses um dieselbe Raum-Datei konkurriert.
+  /// Schließt alle Räume (sauber, ohne dass dabei eigene Trennungs-
+  /// Ereignisse auslösen - siehe `RoomSession.close`), dann den HTTP-
+  /// Listener, und wartet zuletzt auf alle noch laufenden Persistenz-
+  /// Schreibvorgänge.
+  ///
+  /// Reihenfolge ist wichtig: würde man stattdessen zuerst den HTTP-Server
+  /// (auch nur `force: true`) schließen, reißt das die noch offenen
+  /// WebSocket-Verbindungen ab - das löst für jeden Sitzplatz asynchron
+  /// ein `onDone` (= Trennung = ein neuer, nicht mehr abgewarteter
+  /// Persistenz-Schreibvorgang) aus, der erst NACH `waitForPendingSaves()`
+  /// ankommen kann. Räume zuerst regulär zu schließen verhindert das: keine
+  /// neuen Schreibvorgänge mehr, sobald diese Methode zurückkehrt - wichtig
+  /// bei einem Redeploy, damit ein neu startender Prozess nie mit einem
+  /// noch aktiven Schreibvorgang des alten Prozesses um dieselbe
+  /// Raum-Datei konkurriert.
   Future<void> close() async {
     _cleanupTimer?.cancel();
+    for (final room in List.of(manager.rooms)) {
+      await room.close();
+    }
     await _http?.close(force: true);
     await store.waitForPendingSaves();
   }
