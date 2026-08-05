@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
+import '../game/widgets/centered_board_viewport.dart';
 import '../game/widgets/tile_view.dart';
 
 class NetworkGameView extends StatefulWidget {
@@ -32,8 +33,13 @@ class NetworkGameView extends StatefulWidget {
 }
 
 class _NetworkGameViewState extends State<NetworkGameView> {
-  int? _selectedHandIndex;
   final Map<Position, Tile> _pendingPlacements = {};
+
+  /// Merkt sich, welcher Hand-Index bereits vorläufig platziert wurde, damit
+  /// dieser Stein in der Hand-Leiste als leere Lücke statt doppelt
+  /// erscheint - spiegelt `GameController.handSlots`/`_handIndexByPosition`
+  /// im lokalen Spiel.
+  final Map<Position, int> _handIndexByPosition = {};
   bool _isSending = false;
   bool _showStartPulse = true;
   bool _showTutorial = true;
@@ -55,6 +61,24 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     super.dispose();
   }
 
+  void _stageTile(int handIndex, Position position) {
+    if (!widget.canInteract) return;
+    if (handIndex < 0 || handIndex >= widget.ownHand.length) return;
+    if (_pendingPlacements.containsKey(position)) return;
+    if (_handIndexByPosition.containsValue(handIndex)) return;
+    setState(() {
+      _pendingPlacements[position] = widget.ownHand[handIndex];
+      _handIndexByPosition[position] = handIndex;
+    });
+  }
+
+  void _unstageTile(Position position) {
+    setState(() {
+      _pendingPlacements.remove(position);
+      _handIndexByPosition.remove(position);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMyTurn = widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex;
@@ -74,6 +98,14 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       for (final placement in widget.snapshot.board)
         placement.position: placement.tile,
     };
+
+    // Hand-"Slots": bereits vorläufig platzierte Steine erscheinen als
+    // Lücke statt doppelt (in der Hand UND auf dem Brett) - siehe
+    // `GameController.handSlots` im lokalen Spiel für dasselbe Muster.
+    final handSlots = List<Tile?>.from(widget.ownHand);
+    for (final index in _handIndexByPosition.values) {
+      if (index < handSlots.length) handSlots[index] = null;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -105,21 +137,12 @@ class _NetworkGameViewState extends State<NetworkGameView> {
             Expanded(
               child: Stack(
                 children: [
-                  InteractiveViewer(
-                    constrained: false,
-                    minScale: 0.4,
-                    maxScale: 2.5,
-                    boundaryMargin: const EdgeInsets.all(400),
-                    child: _BoardSurface(
-                      board: board,
-                      pendingPlacements: _pendingPlacements,
-                      onSelectPosition: (position) {
-                        if (_selectedHandIndex == null || !widget.canInteract) return;
-                        setState(() {
-                          _pendingPlacements[position] = widget.ownHand[_selectedHandIndex!];
-                        });
-                      },
-                    ),
+                  _BoardSurface(
+                    board: board,
+                    pendingPlacements: _pendingPlacements,
+                    canInteract: widget.canInteract,
+                    onDropTile: _stageTile,
+                    onUnstage: _unstageTile,
                   ),
                   if (_showStartPulse && !widget.snapshot.isOver)
                     Positioned.fill(
@@ -177,7 +200,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                             ),
                             const SizedBox(height: 6),
                             const Text(
-                              'Wähle einen Stein aus deiner Hand, tippe auf das Brett und sende deinen Zug. Ziel ist es, Farben oder Formen in Reihen zu bilden.',
+                              'Ziehe einen Stein aus deiner Hand auf das Brett und sende deinen Zug. Ziel ist es, Farben oder Formen in Reihen zu bilden.',
                             ),
                           ],
                         ),
@@ -229,26 +252,18 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
-                    height: 56,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: widget.ownHand.length,
-                      separatorBuilder: (context, index) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final tile = widget.ownHand[index];
-                        final selected = _selectedHandIndex == index;
-                        return GestureDetector(
-                          key: ValueKey('hand-$index'),
-                          onTap: widget.canInteract
-                              ? () => setState(() => _selectedHandIndex = index)
-                              : null,
-                          child: TileView(
-                            tile: tile,
-                            size: 42,
-                            highlighted: selected,
+                    height: 64,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (var index = 0; index < handSlots.length; index++)
+                          _HandSlot(
+                            key: ValueKey('hand-$index'),
+                            index: index,
+                            tile: handSlots[index],
+                            canInteract: widget.canInteract,
                           ),
-                        );
-                      },
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -267,7 +282,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                       widget.snapshot.isOver
                           ? 'Die Partie ist beendet. Die Punkte werden nun ausgewertet.'
                           : isMyTurn
-                              ? 'Du bist am Zug. Wähle einen Stein und tippe auf das Brett.'
+                              ? 'Du bist am Zug. Ziehe einen Stein auf das Brett.'
                               : 'Warte auf den nächsten Zug.',
                     ),
                   ),
@@ -319,7 +334,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                             setState(() {
                               if (accepted) {
                                 _pendingPlacements.clear();
-                                _selectedHandIndex = null;
+                                _handIndexByPosition.clear();
                               }
                               _isSending = false;
                             });
@@ -337,22 +352,64 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   }
 }
 
+class _HandSlot extends StatelessWidget {
+  const _HandSlot({
+    super.key,
+    required this.index,
+    required this.tile,
+    required this.canInteract,
+  });
+
+  final int index;
+  final Tile? tile;
+  final bool canInteract;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentTile = tile;
+    if (currentTile == null) {
+      return const SizedBox(width: 48, height: 48);
+    }
+    if (!canInteract) {
+      return TileView(tile: currentTile);
+    }
+    return Draggable<int>(
+      data: index,
+      feedback: Material(
+        color: Colors.transparent,
+        child: TileView(tile: currentTile, size: 56),
+      ),
+      childWhenDragging: Opacity(
+        opacity: 0.3,
+        child: TileView(tile: currentTile),
+      ),
+      child: TileView(tile: currentTile),
+    );
+  }
+}
+
 class _BoardSurface extends StatelessWidget {
   const _BoardSurface({
     required this.board,
     required this.pendingPlacements,
-    required this.onSelectPosition,
+    required this.canInteract,
+    required this.onDropTile,
+    required this.onUnstage,
   });
 
   final Map<Position, Tile> board;
   final Map<Position, Tile> pendingPlacements;
-  final void Function(Position position) onSelectPosition;
+  final bool canInteract;
+  final void Function(int handIndex, Position position) onDropTile;
+  final void Function(Position position) onUnstage;
+
+  static const double cellSize = 64;
 
   @override
   Widget build(BuildContext context) {
     final positions = board.keys.toList();
     if (positions.isEmpty) {
-      positions.add(Position(0, 0));
+      positions.add(const Position(0, 0));
     }
 
     var minX = positions.first.x;
@@ -372,7 +429,6 @@ class _BoardSurface extends StatelessWidget {
     minY -= 2;
     maxY += 2;
 
-    final cellSize = 64.0;
     final boardPositions = <Position>[];
     for (var x = minX; x <= maxX; x++) {
       for (var y = minY; y <= maxY; y++) {
@@ -382,58 +438,95 @@ class _BoardSurface extends StatelessWidget {
     final cols = maxX - minX + 1;
     final rows = maxY - minY + 1;
 
-    return SizedBox(
-      width: cols * cellSize,
-      height: rows * cellSize,
-      child: Stack(
-        children: [
-          for (final position in boardPositions)
-            Positioned(
-              left: (position.x - minX) * cellSize,
-              top: (position.y - minY) * cellSize,
-              width: cellSize,
-              height: cellSize,
-              child: GestureDetector(
-                key: ValueKey('board-${position.x}-${position.y}'),
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onSelectPosition(position),
-                child: Center(
-                  child: _BoardCell(
-                    position: position,
-                    tile: board[position] ?? pendingPlacements[position],
-                  ),
+    return CenteredBoardViewport(
+      contentWidth: cols * cellSize,
+      contentHeight: rows * cellSize,
+      child: SizedBox(
+        width: cols * cellSize,
+        height: rows * cellSize,
+        child: Stack(
+          children: [
+            for (final position in boardPositions)
+              Positioned(
+                left: (position.x - minX) * cellSize,
+                top: (position.y - minY) * cellSize,
+                width: cellSize,
+                height: cellSize,
+                child: _BoardCell(
+                  key: ValueKey('board-${position.x}-${position.y}'),
+                  position: position,
+                  existingTile: board[position],
+                  pendingTile: pendingPlacements[position],
+                  canInteract: canInteract,
+                  onDropTile: onDropTile,
+                  onUnstage: onUnstage,
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _BoardCell extends StatelessWidget {
-  const _BoardCell({required this.position, required this.tile});
+  const _BoardCell({
+    super.key,
+    required this.position,
+    required this.existingTile,
+    required this.pendingTile,
+    required this.canInteract,
+    required this.onDropTile,
+    required this.onUnstage,
+  });
 
   final Position position;
-  final Tile? tile;
+  final Tile? existingTile;
+  final Tile? pendingTile;
+  final bool canInteract;
+  final void Function(int handIndex, Position position) onDropTile;
+  final void Function(Position position) onUnstage;
 
   @override
   Widget build(BuildContext context) {
-    final currentTile = tile;
-    if (currentTile == null) {
-      return Container(
-        width: 48,
-        height: 48,
-        margin: const EdgeInsets.all(1),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.6),
+    final existing = existingTile;
+    if (existing != null) {
+      return Center(child: TileView(tile: existing, size: _BoardSurface.cellSize - 16));
+    }
+
+    final pending = pendingTile;
+    if (pending != null) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: canInteract ? () => onUnstage(position) : null,
+        child: Center(
+          child: TileView(
+            tile: pending,
+            size: _BoardSurface.cellSize - 16,
+            highlighted: true,
           ),
         ),
       );
     }
 
-    return Center(child: TileView(tile: currentTile, size: 48));
+    return DragTarget<int>(
+      onWillAcceptWithDetails: (details) => canInteract,
+      onAcceptWithDetails: (details) => onDropTile(details.data, position),
+      builder: (context, candidateData, rejectedData) {
+        final active = candidateData.isNotEmpty;
+        final colorScheme = Theme.of(context).colorScheme;
+        return Container(
+          margin: const EdgeInsets.all(1),
+          decoration: BoxDecoration(
+            color: active ? colorScheme.primary.withValues(alpha: 0.15) : Colors.transparent,
+            border: Border.all(
+              color: active
+                  ? colorScheme.primary.withValues(alpha: 0.6)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
-
