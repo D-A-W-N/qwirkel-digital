@@ -8,8 +8,8 @@ import 'package:qwirkle_digital/src/game/game_screen.dart';
 
 void main() {
   testWidgets(
-    'Das untere Panel im lokalen Spiel lässt sich ein- und wieder ausklappen, '
-    'ohne die Hand dauerhaft zu verlieren',
+    'Die untere Leiste im lokalen Spiel zeigt Hand und Buttons immer '
+    'sofort an, ohne dass man sie erst ausklappen müsste',
     (tester) async {
       final alice = Player(id: 'a', name: 'Alice');
       final bob = Player(id: 'b', name: 'Bob');
@@ -25,27 +25,13 @@ void main() {
         ),
       );
       await tester.pump();
-      // Der "Du bist am Zug"-Dialog zum Partie-Start läge sonst über dem
-      // Ein-/Ausklapp-Icon am unteren Bildschirmrand und würde den Tap
-      // abfangen - erst wegklicken.
-      expect(find.text('Los geht’s'), findsOneWidget);
-      await tester.tap(find.text('Los geht’s'));
-      await tester.pumpAndSettle();
 
-      // Standardmäßig ausgeklappt - Hand ist sofort sichtbar/ziehbar.
+      // Keine Ein-/Ausklapp-Steuerung mehr vorhanden - die Hand ist einfach
+      // immer da.
+      expect(find.byIcon(Icons.expand_more), findsNothing);
+      expect(find.byIcon(Icons.expand_less), findsNothing);
       expect(find.byType(Draggable<int>), findsWidgets);
-      expect(find.byIcon(Icons.expand_more), findsOneWidget);
-
-      await tester.tap(find.byIcon(Icons.expand_more));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(Draggable<int>), findsNothing);
-      expect(find.byIcon(Icons.expand_less), findsOneWidget);
-
-      await tester.tap(find.byIcon(Icons.expand_less));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(Draggable<int>), findsWidgets);
+      expect(find.text('Zug bestätigen'), findsOneWidget);
     },
   );
 }

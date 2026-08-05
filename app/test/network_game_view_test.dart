@@ -630,8 +630,8 @@ void main() {
   );
 
   testWidgets(
-    'Das untere Panel lässt sich ein- und wieder ausklappen, ohne die Hand '
-    'dauerhaft zu verlieren',
+    'Die untere Leiste zeigt die Hand immer sofort an, ohne dass man sie '
+    'erst ausklappen müsste',
     (tester) async {
       final game = QwirkleGame(players: [
         Player(id: 'p1', name: 'Alice'),
@@ -660,20 +660,11 @@ void main() {
       await tester.tap(find.text('Los geht’s'));
       await tester.pump();
 
-      // Standardmäßig ausgeklappt - Hand ist sofort sichtbar.
+      // Keine Ein-/Ausklapp-Steuerung mehr vorhanden - die Hand ist einfach
+      // immer da.
       expect(find.byKey(const ValueKey('hand-0')), findsOneWidget);
-      expect(find.byIcon(Icons.expand_more), findsOneWidget);
-
-      await tester.tap(find.byIcon(Icons.expand_more));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('hand-0')), findsNothing);
-      expect(find.byIcon(Icons.expand_less), findsOneWidget);
-
-      await tester.tap(find.byIcon(Icons.expand_less));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('hand-0')), findsOneWidget);
+      expect(find.byIcon(Icons.expand_more), findsNothing);
+      expect(find.byIcon(Icons.expand_less), findsNothing);
     },
   );
 

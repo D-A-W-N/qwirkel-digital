@@ -5,7 +5,7 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../game/widgets/board_surface.dart';
-import '../game/widgets/collapsible_game_panel.dart';
+import '../game/widgets/game_bottom_bar.dart';
 import '../game/widgets/hand_view.dart';
 import '../game/widgets/score_panel.dart';
 import '../game/widgets/turn_dialog.dart';
@@ -93,13 +93,6 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   bool _exchangeMode = false;
   final Set<int> _selectedForExchange = {};
 
-  /// Ob das untere Panel (Hand + Buttons) gerade ausgeklappt ist - startet
-  /// ausgeklappt und klappt sich automatisch wieder auf, sobald man selbst
-  /// am Zug ist (siehe [didUpdateWidget]), bleibt aber jederzeit manuell
-  /// ein-/ausklappbar - lässt dem Brett standardmäßig fast die volle
-  /// Bildschirmhöhe.
-  bool _panelExpanded = true;
-
   @override
   void initState() {
     super.initState();
@@ -152,17 +145,12 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     if (restarted) {
       _liveError = null;
     }
-    // Sobald ich selbst am Zug bin, klappt sich das Panel automatisch
-    // wieder auf, falls es gerade eingeklappt war, UND ein wegklickbarer
-    // Dialog macht den Zugwechsel unübersehbar - Nutzer-Feedback: nicht
-    // immer sofort ersichtlich, wer am Zug ist.
+    // Ein wegklickbarer Dialog macht es unübersehbar, sobald ich selbst am
+    // Zug bin - Nutzer-Feedback: nicht immer sofort ersichtlich, wer dran ist.
     final becameMyTurn =
         widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex &&
         oldWidget.snapshot.currentPlayerIndex != widget.snapshot.currentPlayerIndex;
     if (becameMyTurn) {
-      if (!_panelExpanded) {
-        _panelExpanded = true;
-      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showTurnDialog(context, message: 'Du bist jetzt am Zug.');
@@ -260,8 +248,8 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
   }
 
-  /// Icon/Farbe/Text der zentralen (jetzt immer sichtbaren, siehe
-  /// [CollapsibleGamePanel]) Statuszeile - priorisiert wie im lokalen Spiel
+  /// Icon/Farbe/Text der zentralen, immer sichtbaren Statuszeile (siehe
+  /// [GameBottomBar]) - priorisiert wie im lokalen Spiel
   /// (`GameScreen._statusIcon`/`_statusColor`/`_statusText`), aber mit
   /// eigenen (Netzwerk-spezifischen) Zuständen. Fehler bleiben bewusst
   /// AUSSERHALB dieser Priorisierung, in einer eigenen, immer sichtbaren
@@ -692,20 +680,15 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                 ],
               ),
             ),
-            // Bewusst ein normales Column-Kind statt eines `Positioned`-
-            // Overlays über dem Brett - siehe Kommentar dazu in
-            // `game_screen.dart`. Am Partie-Ende deckt das Ergebnis-Overlay
+            // Am Partie-Ende deckt das Ergebnis-Overlay
             // (`_buildGameOverOverlay`) bereits alles Nötige ab (inkl.
-            // Neustart-Button), das Panel entfällt dann.
+            // Neustart-Button), die Leiste entfällt dann.
             if (!widget.snapshot.isOver)
-              CollapsibleGamePanel(
-                expanded: _panelExpanded,
-                onExpandedChanged: (value) =>
-                    setState(() => _panelExpanded = value),
-                collapsedIcon: _statusIcon(isMyTurn),
-                collapsedText: _statusText(board, isMyTurn, currentPlayer.name),
-                collapsedColor: _statusColor(context, isMyTurn),
-                expandedChild: Column(
+              GameBottomBar(
+                statusIcon: _statusIcon(isMyTurn),
+                statusText: _statusText(board, isMyTurn, currentPlayer.name),
+                statusColor: _statusColor(context, isMyTurn),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
