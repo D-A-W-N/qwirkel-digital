@@ -213,5 +213,37 @@ void main() {
         expect(host.game!.board.isEmpty, isTrue);
       },
     );
+
+    test(
+      'disconnected feuert, wenn der Host verschwindet (nicht bei aktivem client.close())',
+      () async {
+        final client = ClientSession();
+        await client.connect('127.0.0.1', host.port, name: 'Ben');
+
+        final disconnectedFuture = client.disconnected.first;
+        await host.close();
+        await disconnectedFuture.timeout(const Duration(seconds: 2));
+
+        await client.close();
+      },
+    );
+
+    test(
+      'disconnected feuert NICHT, wenn die Person selbst die Sitzung schließt',
+      () async {
+        final client = ClientSession();
+        await client.connect('127.0.0.1', host.port, name: 'Ben');
+
+        var disconnectedFired = false;
+        client.disconnected.listen((_) => disconnectedFired = true);
+
+        await client.close();
+        // Kurze Wartezeit, damit ein fälschlich doch noch feuerndes Event
+        // Gelegenheit hätte, den Listener zu erreichen.
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+
+        expect(disconnectedFired, isFalse);
+      },
+    );
   });
 }
