@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 
 import '../game_providers.dart';
+import 'centered_board_viewport.dart';
 import 'tile_view.dart';
 
 /// Zeigt das (unbegrenzte) Spielbrett als pan-/zoombares Raster.
@@ -38,11 +39,9 @@ class BoardView extends ConsumerWidget {
     final cols = maxX - minX + 1;
     final rows = maxY - minY + 1;
 
-    return InteractiveViewer(
-      constrained: false,
-      minScale: 0.4,
-      maxScale: 2.5,
-      boundaryMargin: const EdgeInsets.all(400),
+    return CenteredBoardViewport(
+      contentWidth: cols * cellSize,
+      contentHeight: rows * cellSize,
       child: SizedBox(
         width: cols * cellSize,
         height: rows * cellSize,
