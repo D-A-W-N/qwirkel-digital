@@ -5,9 +5,9 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../game/widgets/board_surface.dart';
+import '../game/widgets/collapsible_game_panel.dart';
 import '../game/widgets/hand_view.dart';
 import '../game/widgets/score_panel.dart';
-import '../game/widgets/turn_status_banner.dart';
 
 class NetworkGameView extends StatefulWidget {
   const NetworkGameView({
@@ -92,6 +92,13 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   bool _exchangeMode = false;
   final Set<int> _selectedForExchange = {};
 
+  /// Ob das untere Panel (Hand + Buttons) gerade ausgeklappt ist - startet
+  /// ausgeklappt und klappt sich automatisch wieder auf, sobald man selbst
+  /// am Zug ist (siehe [didUpdateWidget]), bleibt aber jederzeit manuell
+  /// ein-/ausklappbar - lässt dem Brett standardmäßig fast die volle
+  /// Bildschirmhöhe.
+  bool _panelExpanded = true;
+
   @override
   void initState() {
     super.initState();
@@ -143,6 +150,14 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
     if (restarted) {
       _liveError = null;
+    }
+    // Sobald ich selbst am Zug bin, klappt sich das Panel automatisch
+    // wieder auf, falls es gerade eingeklappt war.
+    final becameMyTurn =
+        widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex &&
+        oldWidget.snapshot.currentPlayerIndex != widget.snapshot.currentPlayerIndex;
+    if (becameMyTurn && !_panelExpanded) {
+      _panelExpanded = true;
     }
   }
 
@@ -236,12 +251,14 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
   }
 
-  /// Icon/Farbe/Text der zentralen Statuszeile - priorisiert wie im lokalen
-  /// Spiel (`GameScreen._statusIcon`/`_statusColor`/`_statusText`), aber mit
+  /// Icon/Farbe/Text der zentralen (jetzt immer sichtbaren, siehe
+  /// [CollapsibleGamePanel]) Statuszeile - priorisiert wie im lokalen Spiel
+  /// (`GameScreen._statusIcon`/`_statusColor`/`_statusText`), aber mit
   /// eigenen (Netzwerk-spezifischen) Zuständen. Fehler bleiben bewusst
-  /// AUSSERHALB dieser Priorisierung - sie bekommen weiterhin ihre eigene,
-  /// auffällige rote Box (siehe [build]), statt in der neutralen Statuszeile
-  /// womöglich untern zu gehen.
+  /// AUSSERHALB dieser Priorisierung, in einer eigenen, immer sichtbaren
+  /// Box (siehe [build]) - sonst würde z. B. eine Live-Validierungs­meldung
+  /// die (weiterhin relevante) Punktevorschau der bereits vorbereiteten
+  /// Platzierung verdecken, statt beides gleichzeitig zu zeigen.
   IconData _statusIcon(bool isMyTurn) {
     if (widget.snapshot.isOver) return Icons.celebration_outlined;
     if (_pendingPlacements.isNotEmpty) return Icons.add_circle_outline;
@@ -509,7 +526,8 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     board: board,
                     pendingPlacements: _pendingPlacements,
                     canInteract: widget.canInteract,
-                    onDropTile: (handIndex, position) => _stageTile(board, handIndex, position),
+                    onDropTile: (handIndex, position) =>
+                        _stageTile(board, handIndex, position),
                     onUnstage: _unstageTile,
                     cellSize: _cellSize,
                     tileSize: _tileSize,
@@ -520,178 +538,218 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                       child: Center(
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 600),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.9),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             'Neue Partie gestartet',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onPrimary,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.onPrimary,
+                                ),
                           ),
                         ),
                       ),
                     ),
-                  if (_showTutorial)
+                  if ((_liveError ?? widget.errorText) != null ||
+                      lastMoveSummary != null ||
+                      _showTutorial)
                     Positioned(
                       top: 12,
                       left: 12,
                       right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'So spielst du',
-                                    style: Theme.of(context).textTheme.titleMedium,
+                      child: Column(
+                        children: [
+                          if ((_liveError ?? widget.errorText) != null) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.errorContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 18,
+                                    color: Theme.of(context).colorScheme.error,
                                   ),
-                                ),
-                                TextButton(
-                                  onPressed: () => setState(() => _showTutorial = false),
-                                  child: const Text('Los geht’s'),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      (_liveError ?? widget.errorText)!,
+                                      style: Theme.of(context).textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onErrorContainer,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Ziehe einen Stein aus deiner Hand auf das Brett und sende deinen Zug. Ziel ist es, Farben oder Formen in Reihen zu bilden.',
-                            ),
+                            const SizedBox(height: 8),
                           ],
-                        ),
+                          if (lastMoveSummary != null) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.tertiaryContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.history, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      lastMoveSummary,
+                                      style: Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          if (_showTutorial)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surface.withValues(alpha: 0.95),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'So spielst du',
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleMedium,
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            setState(() => _showTutorial = false),
+                                        child: const Text('Los geht’s'),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Ziehe einen Stein aus deiner Hand auf das Brett und sende deinen Zug. Ziel ist es, Farben oder Formen in Reihen zu bilden.',
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   if (widget.snapshot.isOver) _buildGameOverOverlay(),
                 ],
               ),
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (lastMoveSummary != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.tertiaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.history, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              lastMoveSummary,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if ((_liveError ?? widget.errorText) != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              (_liveError ?? widget.errorText)!,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onErrorContainer,
+            // Bewusst ein normales Column-Kind statt eines `Positioned`-
+            // Overlays über dem Brett - siehe Kommentar dazu in
+            // `game_screen.dart`. Am Partie-Ende deckt das Ergebnis-Overlay
+            // (`_buildGameOverOverlay`) bereits alles Nötige ab (inkl.
+            // Neustart-Button), das Panel entfällt dann.
+            if (!widget.snapshot.isOver)
+              CollapsibleGamePanel(
+                expanded: _panelExpanded,
+                onExpandedChanged: (value) =>
+                    setState(() => _panelExpanded = value),
+                collapsedIcon: _statusIcon(isMyTurn),
+                collapsedText: _statusText(board, isMyTurn, currentPlayer.name),
+                collapsedColor: _statusColor(context, isMyTurn),
+                expandedChild: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.statusText != null &&
+                        widget.statusText!.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.statusText!,
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 8),
+                    ],
+                    Text(
+                      'Du spielst als ${myPlayer.name}',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 8),
-                  ],
-                  if (widget.statusText != null && widget.statusText!.isNotEmpty) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              widget.statusText!,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
+                    HandRow(
+                      slots: handSlots,
+                      canInteract: widget.canInteract,
+                      exchangeMode: _exchangeMode,
+                      selectedForExchange: _selectedForExchange,
+                      onToggleExchange: _toggleExchangeSelection,
                     ),
                     const SizedBox(height: 8),
-                  ],
-                  Text(
-                    'Du spielst als ${myPlayer.name}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  HandRow(
-                    slots: handSlots,
-                    canInteract: widget.canInteract,
-                    exchangeMode: _exchangeMode,
-                    selectedForExchange: _selectedForExchange,
-                    onToggleExchange: _toggleExchangeSelection,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Deine Hand: ${widget.snapshot.players[widget.snapshot.yourPlayerIndex].handCount} Steine',
-                  ),
-                  const SizedBox(height: 8),
-                  TurnStatusBanner(
-                    icon: _statusIcon(isMyTurn),
-                    text: _statusText(board, isMyTurn, currentPlayer.name),
-                    color: _statusColor(context, isMyTurn),
-                  ),
-                  if (!widget.snapshot.isOver) ...[
+                    Text(
+                      'Deine Hand: ${widget.snapshot.players[widget.snapshot.yourPlayerIndex].handCount} Steine',
+                    ),
                     const SizedBox(height: 8),
                     _buildActionButtons(isMyTurn),
                   ],
-                ],
+                ),
               ),
-            ),
           ],
         ),
       ),

@@ -628,4 +628,52 @@ void main() {
       }
     },
   );
+
+  testWidgets(
+    'Das untere Panel lässt sich ein- und wieder ausklappen, ohne die Hand '
+    'dauerhaft zu verlieren',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.currentPlayerIndex = 0;
+      final snapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = snapshot.players[0].hand ?? <Tile>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshot,
+            ownHand: hand,
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pump();
+
+      // Standardmäßig ausgeklappt - Hand ist sofort sichtbar.
+      expect(find.byKey(const ValueKey('hand-0')), findsOneWidget);
+      expect(find.byIcon(Icons.expand_more), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.expand_more));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('hand-0')), findsNothing);
+      expect(find.byIcon(Icons.expand_less), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.expand_less));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('hand-0')), findsOneWidget);
+    },
+  );
 }
