@@ -34,6 +34,12 @@ class TileBag {
 
   bool get isEmpty => _tiles.isEmpty;
 
+  /// Für die Persistenz (z. B. `qwirkle_net`s Raum-Serialisierung): die
+  /// exakten Reststeine in Zugreihenfolge (Ende der Liste wird zuerst
+  /// gezogen) - kann direkt an [TileBag.fromTiles] übergeben werden, um den
+  /// Beutel deterministisch wiederherzustellen.
+  List<Tile> get tiles => List.unmodifiable(_tiles);
+
   /// Zieht bis zu [count] Steine (weniger, falls der Beutel nicht genug enthält).
   List<Tile> draw(int count) {
     final n = min(count, _tiles.length);

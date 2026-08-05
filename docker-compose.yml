@@ -1,0 +1,23 @@
+# Für Coolify: als "Docker Compose"-Ressource auf dieses Repo zeigen lassen
+# (Branch nach Wahl, Compose-Datei-Pfad "docker-compose.yml" am Repo-Root).
+# Coolify übernimmt Reverse-Proxy, TLS und Domain-Zuordnung selbst - dieses
+# File beschreibt nur, wie das Image gebaut wird und welchen Port/Daten-
+# Mount es braucht. Siehe docs/vps_deploy_setup.md für die Einrichtung.
+services:
+  qwirkle-server:
+    build:
+      context: .
+      dockerfile: packages/qwirkle_server/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - qwirkle_data:/data
+    environment:
+      PORT: "8080"
+      DATA_DIR: /data/rooms
+      # Räume ohne Aktivität länger als diese Anzahl Tage werden verworfen.
+      ROOM_RETENTION_DAYS: "14"
+
+volumes:
+  qwirkle_data:

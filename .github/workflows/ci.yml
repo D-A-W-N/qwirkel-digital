@@ -58,3 +58,7 @@ jobs:
       - name: Test net package
         working-directory: packages/qwirkle_net
         run: dart test
+
+      - name: Test server package
+        working-directory: packages/qwirkle_server
+        run: dart test

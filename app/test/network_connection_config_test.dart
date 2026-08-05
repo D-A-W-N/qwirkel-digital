@@ -10,7 +10,7 @@ void main() {
         host: ' 127.0.0.1 ',
         port: '4040',
         name: '  Alice  ',
-        signalingUrl: 'ws://example.test',
+        serverUrl: 'ws://example.test',
         inviteCode: 'room-1',
       );
 
@@ -28,7 +28,7 @@ void main() {
           host: 'localhost',
           port: 'abc',
           name: 'Bob',
-          signalingUrl: 'ws://example.test',
+          serverUrl: 'ws://example.test',
           inviteCode: 'room-1',
         ),
         throwsArgumentError,
