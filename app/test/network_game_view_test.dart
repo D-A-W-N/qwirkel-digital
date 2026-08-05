@@ -676,4 +676,61 @@ void main() {
       expect(find.byKey(const ValueKey('hand-0')), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Ein wegklickbarer Dialog macht es unübersehbar, wenn man selbst am Zug ist',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.currentPlayerIndex = 1;
+      final waitingSnapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = waitingSnapshot.players[0].hand ?? <Tile>[];
+
+      Widget buildView(GameStateSnapshot snapshot) => MaterialApp(
+        home: NetworkGameView(
+          snapshot: snapshot,
+          ownHand: hand,
+          canInteract: true,
+          onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
+        ),
+      );
+
+      await tester.pumpWidget(buildView(waitingSnapshot));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      // Tutorial-Overlay hat selbst einen "Los geht's"-Button - erst
+      // wegtippen, damit er später nicht mit dem des Dialogs verwechselt
+      // wird (bzw. der Finder nicht mehrdeutig wird).
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pump();
+
+      // Beim ersten Aufbau (nicht mein Zug) erscheint noch kein Dialog.
+      expect(find.text('Du bist am Zug'), findsNothing);
+
+      final myTurnSnapshot = GameStateSnapshot(
+        players: waitingSnapshot.players,
+        currentPlayerIndex: 0,
+        bagRemaining: waitingSnapshot.bagRemaining,
+        isOver: waitingSnapshot.isOver,
+        board: waitingSnapshot.board,
+        yourPlayerIndex: waitingSnapshot.yourPlayerIndex,
+      );
+      await tester.pumpWidget(buildView(myTurnSnapshot));
+      await tester.pump();
+
+      expect(find.text('Du bist am Zug'), findsOneWidget);
+      expect(find.text('Du bist jetzt am Zug.'), findsOneWidget);
+
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Du bist am Zug'), findsNothing);
+    },
+  );
 }

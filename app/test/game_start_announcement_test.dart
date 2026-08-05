@@ -45,7 +45,16 @@ void main() {
 
       await tester.pump();
 
+      // Wegklickbarer "Du bist am Zug"-Dialog statt Snackbar - siehe
+      // Nutzer-Feedback, dass der Zugwechsel sonst nicht immer sofort
+      // ersichtlich ist.
+      expect(find.text('Du bist am Zug'), findsOneWidget);
       expect(find.textContaining('Anna beginnt'), findsOneWidget);
+
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Du bist am Zug'), findsNothing);
     },
   );
 }

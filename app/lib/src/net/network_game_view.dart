@@ -8,6 +8,7 @@ import '../game/widgets/board_surface.dart';
 import '../game/widgets/collapsible_game_panel.dart';
 import '../game/widgets/hand_view.dart';
 import '../game/widgets/score_panel.dart';
+import '../game/widgets/turn_dialog.dart';
 
 class NetworkGameView extends StatefulWidget {
   const NetworkGameView({
@@ -152,12 +153,20 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       _liveError = null;
     }
     // Sobald ich selbst am Zug bin, klappt sich das Panel automatisch
-    // wieder auf, falls es gerade eingeklappt war.
+    // wieder auf, falls es gerade eingeklappt war, UND ein wegklickbarer
+    // Dialog macht den Zugwechsel unübersehbar - Nutzer-Feedback: nicht
+    // immer sofort ersichtlich, wer am Zug ist.
     final becameMyTurn =
         widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex &&
         oldWidget.snapshot.currentPlayerIndex != widget.snapshot.currentPlayerIndex;
-    if (becameMyTurn && !_panelExpanded) {
-      _panelExpanded = true;
+    if (becameMyTurn) {
+      if (!_panelExpanded) {
+        _panelExpanded = true;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showTurnDialog(context, message: 'Du bist jetzt am Zug.');
+      });
     }
   }
 

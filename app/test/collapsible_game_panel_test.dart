@@ -25,12 +25,12 @@ void main() {
         ),
       );
       await tester.pump();
-      // Die Start-Ansage (Snackbar) läge sonst über dem Ein-/Ausklapp-Icon
-      // am unteren Bildschirmrand und würde den Tap abfangen.
-      ScaffoldMessenger.of(
-        tester.element(find.byType(GameScreen)),
-      ).removeCurrentSnackBar();
-      await tester.pump();
+      // Der "Du bist am Zug"-Dialog zum Partie-Start läge sonst über dem
+      // Ein-/Ausklapp-Icon am unteren Bildschirmrand und würde den Tap
+      // abfangen - erst wegklicken.
+      expect(find.text('Los geht’s'), findsOneWidget);
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pumpAndSettle();
 
       // Standardmäßig ausgeklappt - Hand ist sofort sichtbar/ziehbar.
       expect(find.byType(Draggable<int>), findsWidgets);
