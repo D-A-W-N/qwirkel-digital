@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-08-05
+
+- The "Zuletzt besuchte Räume" list now marks finished games with a "Beendet" label, and any entry can be removed from the list via a new close button
+
 ## [0.9.9] - 2026-08-05
 
 - Network multiplayer now shows a summary of what the other player just did (tiles placed, exchanged, or passed), matching local play's bot-move highlight
