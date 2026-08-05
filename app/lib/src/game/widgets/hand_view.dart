@@ -5,7 +5,9 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import '../game_providers.dart';
 import 'tile_view.dart';
 
-/// Zeigt die Hand des aktuellen Spielers.
+/// Zeigt die Hand des aktuellen Spielers (lokales Spiel) - dünner
+/// Riverpod-Adapter um [HandRow], das eigentliche (prop-basierte) Rendering
+/// ist mit dem Netzwerkspiel geteilt.
 ///
 /// Im normalen Modus sind die Steine per Drag&Drop auf das Brett ziehbar.
 /// Im Tausch-Modus lassen sie sich stattdessen antippen, um sie für den
@@ -18,59 +20,101 @@ class HandView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.watch(gameControllerProvider);
-    final slots = controller.handSlots;
+    return HandRow(
+      slots: controller.handSlots,
+      // Interaktivität wird hier schon extern über `IgnorePointer` in
+      // `_ControlPanel` gesteuert (siehe `game_screen.dart`) - anders als
+      // im Netzwerkspiel, das keinen solchen Wrapper hat und stattdessen
+      // [HandRow.canInteract] selbst auswertet.
+      canInteract: true,
+      exchangeMode: exchangeMode,
+      selectedForExchange: controller.selectedForExchange,
+      onToggleExchange: controller.toggleExchangeSelection,
+    );
+  }
+}
 
+/// Präsentationelle (rein prop-basierte) Zeile aller Hand-Slots - von
+/// lokalem und Netzwerk-Spiel gemeinsam genutzt.
+class HandRow extends StatelessWidget {
+  const HandRow({
+    super.key,
+    required this.slots,
+    required this.canInteract,
+    required this.exchangeMode,
+    required this.selectedForExchange,
+    required this.onToggleExchange,
+  });
+
+  final List<Tile?> slots;
+  final bool canInteract;
+  final bool exchangeMode;
+  final Set<int> selectedForExchange;
+  final void Function(int handIndex) onToggleExchange;
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
       height: 64,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           for (var i = 0; i < slots.length; i++)
-            _HandSlot(index: i, tile: slots[i], exchangeMode: exchangeMode),
+            HandSlot(
+              key: ValueKey('hand-$i'),
+              index: i,
+              tile: slots[i],
+              canInteract: canInteract,
+              exchangeMode: exchangeMode,
+              selectedForExchange: selectedForExchange.contains(i),
+              onToggleExchange: () => onToggleExchange(i),
+            ),
         ],
       ),
     );
   }
 }
 
-class _HandSlot extends ConsumerWidget {
-  final int index;
-  final Tile? tile;
-  final bool exchangeMode;
-
-  const _HandSlot({
+class HandSlot extends StatelessWidget {
+  const HandSlot({
+    super.key,
     required this.index,
     required this.tile,
+    required this.canInteract,
     required this.exchangeMode,
+    required this.selectedForExchange,
+    required this.onToggleExchange,
   });
 
+  final int index;
+  final Tile? tile;
+  final bool canInteract;
+  final bool exchangeMode;
+  final bool selectedForExchange;
+  final VoidCallback onToggleExchange;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final currentTile = tile;
     if (currentTile == null) {
       return const SizedBox(width: 48, height: 48);
     }
-
-    final controller = ref.watch(gameControllerProvider);
-
+    if (!canInteract) {
+      return TileView(tile: currentTile);
+    }
     if (exchangeMode) {
-      final selected = controller.selectedForExchange.contains(index);
       return GestureDetector(
-        onTap: () => controller.toggleExchangeSelection(index),
-        child: TileView(tile: currentTile, highlighted: selected),
+        onTap: onToggleExchange,
+        child: TileView(tile: currentTile, highlighted: selectedForExchange),
       );
     }
-
     return Draggable<int>(
       data: index,
       feedback: Material(
         color: Colors.transparent,
         child: TileView(tile: currentTile, size: 56),
       ),
-      childWhenDragging: Opacity(
-        opacity: 0.3,
-        child: TileView(tile: currentTile),
-      ),
+      childWhenDragging: Opacity(opacity: 0.3, child: TileView(tile: currentTile)),
       child: TileView(tile: currentTile),
     );
   }
