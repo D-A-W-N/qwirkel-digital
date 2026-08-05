@@ -42,6 +42,14 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
     setState(() => _recentRooms = entries);
   }
 
+  Future<void> _dismissRecentRoom(String roomCode) async {
+    await forgetInternetRoom(roomCode);
+    if (!mounted) return;
+    setState(() {
+      _recentRooms = _recentRooms.where((e) => e.roomCode != roomCode).toList();
+    });
+  }
+
   @override
   void dispose() {
     _hostController.dispose();
@@ -184,10 +192,31 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                   (entry) => Card(
                     margin: const EdgeInsets.only(bottom: 4),
                     child: ListTile(
-                      leading: const Icon(Icons.history),
-                      title: Text(entry.roomCode),
+                      leading: Icon(
+                        entry.isOver ? Icons.flag_outlined : Icons.history,
+                      ),
+                      title: Row(
+                        children: [
+                          Text(entry.roomCode),
+                          if (entry.isOver) ...[
+                            const SizedBox(width: 8),
+                            Chip(
+                              label: const Text('Beendet'),
+                              labelStyle: Theme.of(context).textTheme.labelSmall,
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: EdgeInsets.zero,
+                            ),
+                          ],
+                        ],
+                      ),
                       subtitle: Text(
                         'als ${entry.playerName} · zuletzt ${_formatLastSeen(entry.lastSeen)}',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Aus der Historie entfernen',
+                        onPressed: () => _dismissRecentRoom(entry.roomCode),
                       ),
                       onTap: () {
                         setState(() {
