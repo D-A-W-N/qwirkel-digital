@@ -344,4 +344,66 @@ void main() {
       expect(find.text('Steine tauschen…'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Zeigt eine Zusammenfassung des letzten fremden Zugs an, aber nicht für den eigenen',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.currentPlayerIndex = 0;
+      final baseSnapshot = GameStateSnapshot.forRecipient(game, 0);
+
+      final snapshotWithOthersMove = GameStateSnapshot(
+        players: baseSnapshot.players,
+        currentPlayerIndex: baseSnapshot.currentPlayerIndex,
+        bagRemaining: baseSnapshot.bagRemaining,
+        isOver: baseSnapshot.isOver,
+        board: baseSnapshot.board,
+        yourPlayerIndex: baseSnapshot.yourPlayerIndex,
+        lastMove: const LastMoveInfo(playerIndex: 1, kind: LastMoveKind.exchanged),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshotWithOthersMove,
+            ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+          ),
+        ),
+      );
+
+      expect(find.text('Bob hat Steine getauscht.'), findsOneWidget);
+
+      final snapshotWithOwnMove = GameStateSnapshot(
+        players: baseSnapshot.players,
+        currentPlayerIndex: baseSnapshot.currentPlayerIndex,
+        bagRemaining: baseSnapshot.bagRemaining,
+        isOver: baseSnapshot.isOver,
+        board: baseSnapshot.board,
+        yourPlayerIndex: baseSnapshot.yourPlayerIndex,
+        lastMove: const LastMoveInfo(playerIndex: 0, kind: LastMoveKind.passed),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshotWithOwnMove,
+            ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+          ),
+        ),
+      );
+
+      expect(find.textContaining('hat den Zug übergangen'), findsNothing);
+    },
+  );
 }

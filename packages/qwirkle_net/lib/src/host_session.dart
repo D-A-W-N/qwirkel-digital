@@ -36,6 +36,11 @@ class HostSession {
   QwirkleGame? _game;
   int _nextClientNumber = 1;
 
+  /// Was beim letzten Zug passiert ist - für ein Live-"was hat die andere
+  /// Person gerade gemacht"-Feedback bei den Clients, siehe
+  /// [GameStateSnapshot.lastMove].
+  LastMoveInfo? _lastMove;
+
   /// Spieler-Indizes, deren Transport mitten in der Partie getrennt wurde.
   /// Kein Wiederverbinden auf denselben Sitzplatz (bräuchte Session-Tokens
   /// und eine Rejoin-UI) — stattdessen wird ihr Zug automatisch
@@ -167,15 +172,29 @@ class HostSession {
     try {
       if (message is MoveMessage) {
         _requireCurrentPlayer(client);
-        game.playTiles(message.placements);
+        final score = game.playTiles(message.placements);
+        _lastMove = LastMoveInfo(
+          playerIndex: client.playerIndex!,
+          kind: LastMoveKind.placed,
+          placements: message.placements,
+          score: score,
+        );
         _statusController.add('${client.name} hat einen Zug gespielt');
       } else if (message is ExchangeMessage) {
         _requireCurrentPlayer(client);
         game.exchangeTiles(message.tiles);
+        _lastMove = LastMoveInfo(
+          playerIndex: client.playerIndex!,
+          kind: LastMoveKind.exchanged,
+        );
         _statusController.add('${client.name} hat Steine getauscht');
       } else if (message is PassMessage) {
         _requireCurrentPlayer(client);
         game.passTurn();
+        _lastMove = LastMoveInfo(
+          playerIndex: client.playerIndex!,
+          kind: LastMoveKind.passed,
+        );
         _statusController.add('${client.name} hat den Zug übergangen');
       } else {
         return;
@@ -234,6 +253,7 @@ class HostSession {
     ];
     final game = QwirkleGame(players: players);
     _game = game;
+    _lastMove = null;
     _disconnectedPlayerIndexes.clear();
     for (var i = 0; i < _clients.length; i++) {
       _clients[i].playerIndex = i + 1;
@@ -251,7 +271,11 @@ class HostSession {
     for (final c in _clients) {
       final index = c.playerIndex;
       if (index == null) continue;
-      c.send(GameStateMessage(GameStateSnapshot.forRecipient(game, index)));
+      c.send(
+        GameStateMessage(
+          GameStateSnapshot.forRecipient(game, index, lastMove: _lastMove),
+        ),
+      );
     }
   }
 
@@ -265,6 +289,12 @@ class HostSession {
   int? playHostMove(List<TilePlacement> placements) {
     try {
       final score = _game!.playTiles(placements);
+      _lastMove = LastMoveInfo(
+        playerIndex: 0,
+        kind: LastMoveKind.placed,
+        placements: placements,
+        score: score,
+      );
       _skipDisconnectedPlayers();
       _broadcastState();
       _stateController.add(null);
@@ -297,6 +327,7 @@ class HostSession {
       for (final c in _clients) Player(id: c.playerId, name: c.name),
     ];
     _game = QwirkleGame(players: players);
+    _lastMove = null;
     _disconnectedPlayerIndexes.clear();
     for (var i = 0; i < _clients.length; i++) {
       _clients[i].playerIndex = i + 1;
@@ -310,6 +341,7 @@ class HostSession {
   void exchangeHostTiles(List<Tile> tiles) {
     try {
       _game!.exchangeTiles(tiles);
+      _lastMove = const LastMoveInfo(playerIndex: 0, kind: LastMoveKind.exchanged);
       _skipDisconnectedPlayers();
       _broadcastState();
       _stateController.add(null);
@@ -327,6 +359,7 @@ class HostSession {
   void passHostTurn() {
     try {
       _game!.passTurn();
+      _lastMove = const LastMoveInfo(playerIndex: 0, kind: LastMoveKind.passed);
       _skipDisconnectedPlayers();
       _broadcastState();
       _stateController.add(null);
@@ -341,7 +374,7 @@ class HostSession {
   GameStateSnapshot? snapshotForHost() {
     final game = _game;
     if (game == null) return null;
-    return GameStateSnapshot.forRecipient(game, 0);
+    return GameStateSnapshot.forRecipient(game, 0, lastMove: _lastMove);
   }
 
   Future<void> close() async {
