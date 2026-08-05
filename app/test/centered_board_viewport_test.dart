@@ -4,7 +4,7 @@ import 'package:qwirkle_digital/src/game/widgets/centered_board_viewport.dart';
 
 void main() {
   testWidgets(
-    'CenteredBoardViewport zentriert den Inhalt beim ersten Layout statt oben links zu starten',
+    'CenteredBoardViewport zentriert auf den Fokuspunkt beim ersten Layout statt oben links zu starten',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -13,9 +13,9 @@ void main() {
               width: 400,
               height: 300,
               child: CenteredBoardViewport(
-                contentWidth: 1000,
-                contentHeight: 800,
-                child: Container(width: 1000, height: 800, color: Colors.red),
+                contentSize: const Size(2000, 1600),
+                focalPoint: const Offset(1000, 800),
+                child: Container(color: Colors.red),
               ),
             ),
           ),
@@ -28,9 +28,9 @@ void main() {
       final controller = viewer.transformationController!;
 
       final translation = controller.value.getTranslation();
-      // Erwartete Zentrierung: Viewport (400x300) minus halbe Inhaltsgröße.
-      expect(translation.x, closeTo(400 / 2 - 1000 / 2, 0.01));
-      expect(translation.y, closeTo(300 / 2 - 800 / 2, 0.01));
+      // Erwartete Zentrierung: Viewport (400x300) minus Fokuspunkt.
+      expect(translation.x, closeTo(400 / 2 - 1000, 0.01));
+      expect(translation.y, closeTo(300 / 2 - 800, 0.01));
 
       // Weiteres Pumpen (z. B. durch nachfolgende Inhaltsänderungen) darf
       // NICHT erneut zentrieren - das würde die Ansicht unter dem:der

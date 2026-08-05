@@ -156,7 +156,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                 const Text(
                   'Der Einladungscode wird nach dem Erstellen des Raums angezeigt und kann dann geteilt werden.',
                 )
-              else ...[
+              else
                 TextField(
                   controller: _inviteCodeController,
                   decoration: const InputDecoration(
@@ -164,37 +164,46 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                     border: OutlineInputBorder(),
                   ),
                 ),
-                if (_recentRooms.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    'Zuletzt besuchte Räume',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Partien können sich über mehrere Tage ziehen - hier geht es direkt zurück in einen bereits besuchten Raum.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  const SizedBox(height: 4),
-                  ..._recentRooms.map(
-                    (entry) => Card(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      child: ListTile(
-                        leading: const Icon(Icons.history),
-                        title: Text(entry.roomCode),
-                        subtitle: Text(
-                          'als ${entry.playerName} · zuletzt ${_formatLastSeen(entry.lastSeen)}',
-                        ),
-                        onTap: () {
-                          setState(() {
-                            _inviteCodeController.text = entry.roomCode;
-                            _nameController.text = entry.playerName;
-                          });
-                        },
+              // Immer sichtbar, unabhängig vom Hosting-/Beitritts-Umschalter:
+              // auch wer selbst gehostet hat, muss nach dem Verlassen wieder
+              // zurückfinden - ohne das war der eigene Raum nach dem
+              // Beenden nirgends mehr auffindbar.
+              if (_recentRooms.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Zuletzt besuchte Räume',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Partien können sich über mehrere Tage ziehen - hier geht es direkt zurück in einen bereits besuchten Raum (als Host oder Mitspieler:in).',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                ..._recentRooms.map(
+                  (entry) => Card(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    child: ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text(entry.roomCode),
+                      subtitle: Text(
+                        'als ${entry.playerName} · zuletzt ${_formatLastSeen(entry.lastSeen)}',
                       ),
+                      onTap: () {
+                        setState(() {
+                          // Zurückkehren läuft immer über den Beitritts-Flow
+                          // (mit gespeichertem Reconnect-Token) - die
+                          // Owner-Rechte kommen dabei vom Server zurück,
+                          // unabhängig davon, ob man den Raum ursprünglich
+                          // selbst erstellt hat.
+                          _isHosting = false;
+                          _inviteCodeController.text = entry.roomCode;
+                          _nameController.text = entry.playerName;
+                        });
+                      },
                     ),
                   ),
-                ],
+                ),
               ],
             ],
             const SizedBox(height: 16),

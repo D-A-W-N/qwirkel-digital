@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
+import '../game/widgets/board_geometry.dart';
 import '../game/widgets/centered_board_viewport.dart';
 import '../game/widgets/tile_view.dart';
 
@@ -77,6 +78,48 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       _pendingPlacements.remove(position);
       _handIndexByPosition.remove(position);
     });
+  }
+
+  /// Punktwert der aktuell vorläufig platzierten Steine, live nachgerechnet
+  /// - `null`, falls noch nichts platziert ist oder die Platzierung für
+  /// sich genommen (noch) keinen gültigen Zug ergibt (z. B. Lücke in der
+  /// Reihe). Reine Vorschau: der Server validiert beim tatsächlichen
+  /// Senden ohnehin verbindlich, hier nur zur Live-Anzeige wie im lokalen
+  /// Spiel (`GameController.pendingScore`).
+  int? _pendingScore(Map<Position, Tile> board) {
+    if (_pendingPlacements.isEmpty) return null;
+    final previewBoard = Board()
+      ..apply([
+        for (final entry in board.entries)
+          TilePlacement(position: entry.key, tile: entry.value),
+      ]);
+    try {
+      return previewBoard.scorePlacement([
+        for (final entry in _pendingPlacements.entries)
+          TilePlacement(position: entry.key, tile: entry.value),
+      ]);
+    } on InvalidMoveException {
+      return null;
+    }
+  }
+
+  String _statusText(Map<Position, Tile> board, bool isMyTurn) {
+    if (widget.snapshot.isOver) {
+      return 'Die Partie ist beendet. Die Punkte werden nun ausgewertet.';
+    }
+    if (_pendingPlacements.isNotEmpty) {
+      final score = _pendingScore(board);
+      // Zwei getrennte Zahlen, damit der Punktwert dieses einen Zugs nicht
+      // mit dem laufenden Gesamtstand der Partie verwechselt wird - siehe
+      // dieselbe Unterscheidung im lokalen Spiel (`GameController`).
+      final scoreSuffix = score != null
+          ? '\nDieser Zug: $score Punkt${score == 1 ? '' : 'e'} '
+                '· Gesamt danach: ${widget.snapshot.players[widget.snapshot.yourPlayerIndex].score + score}'
+          : '';
+      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.$scoreSuffix';
+    }
+    if (!isMyTurn) return 'Warte auf den nächsten Zug.';
+    return 'Du bist am Zug. Ziehe einen Stein auf das Brett.';
   }
 
   @override
@@ -278,13 +321,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                       color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      widget.snapshot.isOver
-                          ? 'Die Partie ist beendet. Die Punkte werden nun ausgewertet.'
-                          : isMyTurn
-                              ? 'Du bist am Zug. Ziehe einen Stein auf das Brett.'
-                              : 'Warte auf den nächsten Zug.',
-                    ),
+                    child: Text(_statusText(board, isMyTurn)),
                   ),
                   if (widget.snapshot.isOver) ...[
                     const SizedBox(height: 8),
@@ -407,7 +444,11 @@ class _BoardSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final positions = board.keys.toList();
+    // Vorläufige (noch nicht gesendete) Platzierungen zählen mit in die
+    // Bounding Box, damit sich der sichtbare Bereich schon während des
+    // eigenen Zugs erweitert, statt erst nach dem nächsten Snapshot vom
+    // Server - spiegelt `BoardView`s lokales Verhalten.
+    final positions = [...board.keys, ...pendingPlacements.keys];
     if (positions.isEmpty) {
       positions.add(const Position(0, 0));
     }
@@ -435,35 +476,34 @@ class _BoardSurface extends StatelessWidget {
         boardPositions.add(Position(x, y));
       }
     }
-    final cols = maxX - minX + 1;
-    final rows = maxY - minY + 1;
+
+    const geometry = BoardGeometry(cellSize);
 
     return CenteredBoardViewport(
-      contentWidth: cols * cellSize,
-      contentHeight: rows * cellSize,
-      child: SizedBox(
-        width: cols * cellSize,
-        height: rows * cellSize,
-        child: Stack(
-          children: [
-            for (final position in boardPositions)
-              Positioned(
-                left: (position.x - minX) * cellSize,
-                top: (position.y - minY) * cellSize,
-                width: cellSize,
-                height: cellSize,
-                child: _BoardCell(
-                  key: ValueKey('board-${position.x}-${position.y}'),
-                  position: position,
-                  existingTile: board[position],
-                  pendingTile: pendingPlacements[position],
-                  canInteract: canInteract,
-                  onDropTile: onDropTile,
-                  onUnstage: onUnstage,
-                ),
+      contentSize: Size(geometry.totalSize, geometry.totalSize),
+      focalPoint: Offset(
+        geometry.pixelX(((minX + maxX) / 2).round()),
+        geometry.pixelY(((minY + maxY) / 2).round()),
+      ),
+      child: Stack(
+        children: [
+          for (final position in boardPositions)
+            Positioned(
+              left: geometry.pixelX(position.x),
+              top: geometry.pixelY(position.y),
+              width: cellSize,
+              height: cellSize,
+              child: _BoardCell(
+                key: ValueKey('board-${position.x}-${position.y}'),
+                position: position,
+                existingTile: board[position],
+                pendingTile: pendingPlacements[position],
+                canInteract: canInteract,
+                onDropTile: onDropTile,
+                onUnstage: onUnstage,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

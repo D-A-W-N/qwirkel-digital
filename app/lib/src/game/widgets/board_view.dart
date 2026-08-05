@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 
 import '../game_providers.dart';
+import 'board_geometry.dart';
 import 'centered_board_viewport.dart';
 import 'tile_view.dart';
 
@@ -36,28 +37,26 @@ class BoardView extends ConsumerWidget {
     minY -= margin;
     maxY += margin;
 
-    final cols = maxX - minX + 1;
-    final rows = maxY - minY + 1;
+    const geometry = BoardGeometry(cellSize);
 
     return CenteredBoardViewport(
-      contentWidth: cols * cellSize,
-      contentHeight: rows * cellSize,
-      child: SizedBox(
-        width: cols * cellSize,
-        height: rows * cellSize,
-        child: Stack(
-          children: [
-            for (var x = minX; x <= maxX; x++)
-              for (var y = minY; y <= maxY; y++)
-                Positioned(
-                  left: (x - minX) * cellSize,
-                  top: (y - minY) * cellSize,
-                  width: cellSize,
-                  height: cellSize,
-                  child: _BoardCell(position: Position(x, y)),
-                ),
-          ],
-        ),
+      contentSize: Size(geometry.totalSize, geometry.totalSize),
+      focalPoint: Offset(
+        geometry.pixelX(((minX + maxX) / 2).round()),
+        geometry.pixelY(((minY + maxY) / 2).round()),
+      ),
+      child: Stack(
+        children: [
+          for (var x = minX; x <= maxX; x++)
+            for (var y = minY; y <= maxY; y++)
+              Positioned(
+                left: geometry.pixelX(x),
+                top: geometry.pixelY(y),
+                width: cellSize,
+                height: cellSize,
+                child: _BoardCell(position: Position(x, y)),
+              ),
+        ],
       ),
     );
   }
