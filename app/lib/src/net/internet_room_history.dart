@@ -14,11 +14,18 @@ class InternetRoomEntry {
   final String reconnectToken;
   final DateTime lastSeen;
 
+  /// Ob die Partie in diesem Raum beendet ist (letzter bekannter Stand) -
+  /// steuert die "Beendet"-Kennzeichnung in der Raum-Historie, siehe
+  /// Nutzer-Feedback "Spiele die beendet sind sollten als diese in der
+  /// Historie gekennzeichnet sein".
+  final bool isOver;
+
   const InternetRoomEntry({
     required this.roomCode,
     required this.playerName,
     required this.reconnectToken,
     required this.lastSeen,
+    this.isOver = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -26,6 +33,7 @@ class InternetRoomEntry {
     'playerName': playerName,
     'reconnectToken': reconnectToken,
     'lastSeen': lastSeen.toIso8601String(),
+    'isOver': isOver,
   };
 
   factory InternetRoomEntry.fromJson(Map<String, dynamic> json) =>
@@ -34,6 +42,9 @@ class InternetRoomEntry {
         playerName: json['playerName'] as String,
         reconnectToken: json['reconnectToken'] as String,
         lastSeen: DateTime.parse(json['lastSeen'] as String),
+        // Bereits gespeicherte Einträge aus früheren Versionen kennen das
+        // Feld noch nicht - dann galt implizit "nicht beendet".
+        isOver: json['isOver'] as bool? ?? false,
       );
 }
 

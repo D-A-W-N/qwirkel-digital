@@ -94,6 +94,48 @@ class PlayerView {
   );
 }
 
+/// Art der zuletzt ausgeführten Aktion, siehe [LastMoveInfo].
+enum LastMoveKind { placed, exchanged, passed }
+
+/// Was beim letzten Zug passiert ist - für ein Live-Feedback beim Empfang
+/// eines neuen Zustands ("was hat die andere Person gerade gemacht"),
+/// analog zu `lastBotSummary`/`lastBotPlacements` im lokalen Spiel. `null`
+/// in [GameStateSnapshot.lastMove], solange noch niemand am Zug war (der
+/// allererste Zustand nach Spielstart).
+class LastMoveInfo {
+  final int playerIndex;
+  final LastMoveKind kind;
+
+  /// Nur bei [LastMoveKind.placed] befüllt: die gerade gelegten Steine.
+  final List<TilePlacement> placements;
+
+  /// Nur bei [LastMoveKind.placed] befüllt: der dabei erzielte Punktwert.
+  final int score;
+
+  const LastMoveInfo({
+    required this.playerIndex,
+    required this.kind,
+    this.placements = const [],
+    this.score = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'playerIndex': playerIndex,
+    'kind': kind.name,
+    if (placements.isNotEmpty) 'placements': placementsToJson(placements),
+    if (score != 0) 'score': score,
+  };
+
+  factory LastMoveInfo.fromJson(Map<String, dynamic> json) => LastMoveInfo(
+    playerIndex: json['playerIndex'] as int,
+    kind: LastMoveKind.values.byName(json['kind'] as String),
+    placements: json['placements'] != null
+        ? placementsFromJson(json['placements'] as List<dynamic>)
+        : const [],
+    score: json['score'] as int? ?? 0,
+  );
+}
+
 /// Vollständiger, für einen bestimmten Empfänger zugeschnittener Spielstand.
 class GameStateSnapshot {
   final List<PlayerView> players;
@@ -102,6 +144,7 @@ class GameStateSnapshot {
   final bool isOver;
   final List<TilePlacement> board;
   final int yourPlayerIndex;
+  final LastMoveInfo? lastMove;
 
   const GameStateSnapshot({
     required this.players,
@@ -110,14 +153,19 @@ class GameStateSnapshot {
     required this.isOver,
     required this.board,
     required this.yourPlayerIndex,
+    this.lastMove,
   });
 
   /// Baut den Snapshot aus [game] auf, wobei nur die Hand von
-  /// [recipientPlayerIndex] mitgeschickt wird.
+  /// [recipientPlayerIndex] mitgeschickt wird. [lastMove] beschreibt die
+  /// Aktion, die zu diesem Zustand geführt hat (vom Aufrufer - der die
+  /// gerade verarbeitete Nachricht kennt - explizit übergeben, da
+  /// [QwirkleGame] selbst keine "letzter Zug"-Historie führt).
   factory GameStateSnapshot.forRecipient(
     QwirkleGame game,
-    int recipientPlayerIndex,
-  ) {
+    int recipientPlayerIndex, {
+    LastMoveInfo? lastMove,
+  }) {
     return GameStateSnapshot(
       players: [
         for (var i = 0; i < game.players.length; i++)
@@ -134,6 +182,7 @@ class GameStateSnapshot {
           TilePlacement(position: entry.key, tile: entry.value),
       ],
       yourPlayerIndex: recipientPlayerIndex,
+      lastMove: lastMove,
     );
   }
 
@@ -144,6 +193,7 @@ class GameStateSnapshot {
     'isOver': isOver,
     'board': placementsToJson(board),
     'yourPlayerIndex': yourPlayerIndex,
+    if (lastMove != null) 'lastMove': lastMove!.toJson(),
   };
 
   factory GameStateSnapshot.fromJson(Map<String, dynamic> json) =>
@@ -156,5 +206,8 @@ class GameStateSnapshot {
         isOver: json['isOver'] as bool,
         board: placementsFromJson(json['board'] as List<dynamic>),
         yourPlayerIndex: json['yourPlayerIndex'] as int,
+        lastMove: json['lastMove'] != null
+            ? LastMoveInfo.fromJson(json['lastMove'] as Map<String, dynamic>)
+            : null,
       );
 }

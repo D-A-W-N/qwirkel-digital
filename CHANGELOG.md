@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-08-05
+
+- Network multiplayer now shows a summary of what the other player just did (tiles placed, exchanged, or passed), matching local play's bot-move highlight
+- Replaced the still-clickable Zug senden/Zurücknehmen/Tauschen/Aussetzen buttons at the end of a network game with a centered overlay showing final scores and, for the room owner, a way to start a new round
+
 ## [0.9.8] - 2026-08-05
 
 - Changed house rule: emptying your hand no longer awards a 6-point bonus

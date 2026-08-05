@@ -23,6 +23,8 @@ void main() {
           onSendMove: (placements) async => true,
           onSendPass: () {},
           onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
         ),
       ),
     );
@@ -52,14 +54,86 @@ void main() {
           onSendMove: (placements) async => true,
           onSendPass: () {},
           onSendExchange: (tiles) {},
+          isRoomOwner: true,
+          onRestartGame: () {},
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Partie beendet'), findsWidgets);
-    expect(find.text('Alice: 11 Punkte (Gewinner)'), findsOneWidget);
+    expect(find.text('Alice gewinnt!'), findsOneWidget);
+    expect(find.text('11 Punkte'), findsOneWidget);
+    expect(find.text('Neues Spiel'), findsOneWidget);
+    // Die Zug-/Tausch-/Aussetzen-Buttons dürfen nach Partie-Ende nicht mehr
+    // bedienbar sein - genau der Fehler, den das Overlay beheben sollte.
+    expect(find.text('Zug senden'), findsNothing);
+    expect(find.text('Steine tauschen…'), findsNothing);
+    expect(find.text('Aussetzen'), findsNothing);
   });
+
+  testWidgets(
+    'Nur die Person mit Owner-Rechten sieht den Neustart-Button im Partie-Ende-Overlay, '
+    'ein Tippen darauf löst onRestartGame aus',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.isOver = true;
+      final snapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = snapshot.players[0].hand ?? <Tile>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshot,
+            ownHand: hand,
+            canInteract: false,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Neues Spiel'), findsNothing);
+      expect(
+        find.text('Warte, bis der/die Raumersteller:in eine neue Partie startet.'),
+        findsOneWidget,
+      );
+
+      var restarted = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshot,
+            ownHand: hand,
+            canInteract: false,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: true,
+            onRestartGame: () => restarted = true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Neues Spiel'), findsOneWidget);
+      // Die Karte kann höher sein als der im Test verfügbare Platz (jetzt
+      // per SingleChildScrollView scrollbar statt zu überlaufen) - den
+      // Button erst in den sichtbaren Bereich scrollen, bevor er angetippt
+      // werden kann.
+      await tester.ensureVisible(find.text('Neues Spiel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Neues Spiel'));
+      expect(restarted, isTrue);
+    },
+  );
 
   testWidgets('NetworkGameView zeigt eine kurze Spielhilfe an', (tester) async {
     final game = QwirkleGame(players: [
@@ -78,6 +152,8 @@ void main() {
           onSendMove: (placements) async => true,
           onSendPass: () {},
           onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
         ),
       ),
     );
@@ -116,6 +192,8 @@ void main() {
           },
           onSendPass: () {},
           onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
         ),
       ),
     );
@@ -169,6 +247,8 @@ void main() {
             onSendMove: (placements) async => true,
             onSendPass: () {},
             onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
           ),
         ),
       );
@@ -219,6 +299,8 @@ void main() {
           onSendMove: (placements) async => true,
           onSendPass: () {},
           onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
           errorText: errorText,
         ),
       );
@@ -271,6 +353,8 @@ void main() {
             onSendMove: (placements) async => true,
             onSendPass: () {},
             onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
           ),
         ),
       );
@@ -293,6 +377,8 @@ void main() {
             onSendMove: (placements) async => true,
             onSendPass: () => passed = true,
             onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
           ),
         ),
       );
@@ -324,6 +410,8 @@ void main() {
             onSendMove: (placements) async => true,
             onSendPass: () {},
             onSendExchange: (tiles) => exchangedTiles = tiles,
+            isRoomOwner: false,
+            onRestartGame: () {},
           ),
         ),
       );
@@ -342,6 +430,72 @@ void main() {
       expect(exchangedTiles, [hand[0]]);
       // Der Tausch-Modus wird nach dem Bestätigen wieder verlassen.
       expect(find.text('Steine tauschen…'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Zeigt eine Zusammenfassung des letzten fremden Zugs an, aber nicht für den eigenen',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      game.currentPlayerIndex = 0;
+      final baseSnapshot = GameStateSnapshot.forRecipient(game, 0);
+
+      final snapshotWithOthersMove = GameStateSnapshot(
+        players: baseSnapshot.players,
+        currentPlayerIndex: baseSnapshot.currentPlayerIndex,
+        bagRemaining: baseSnapshot.bagRemaining,
+        isOver: baseSnapshot.isOver,
+        board: baseSnapshot.board,
+        yourPlayerIndex: baseSnapshot.yourPlayerIndex,
+        lastMove: const LastMoveInfo(playerIndex: 1, kind: LastMoveKind.exchanged),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshotWithOthersMove,
+            ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('Bob hat Steine getauscht.'), findsOneWidget);
+
+      final snapshotWithOwnMove = GameStateSnapshot(
+        players: baseSnapshot.players,
+        currentPlayerIndex: baseSnapshot.currentPlayerIndex,
+        bagRemaining: baseSnapshot.bagRemaining,
+        isOver: baseSnapshot.isOver,
+        board: baseSnapshot.board,
+        yourPlayerIndex: baseSnapshot.yourPlayerIndex,
+        lastMove: const LastMoveInfo(playerIndex: 0, kind: LastMoveKind.passed),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshotWithOwnMove,
+            ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
+            canInteract: true,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
+        ),
+      );
+
+      expect(find.textContaining('hat den Zug übergangen'), findsNothing);
     },
   );
 }

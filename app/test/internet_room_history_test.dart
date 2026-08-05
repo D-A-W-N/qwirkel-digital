@@ -98,5 +98,40 @@ void main() {
       final entries = await loadInternetRoomHistory();
       expect(entries.map((e) => e.roomCode), ['NEW01', 'OLD01']);
     });
+
+    test('isOver wird persistiert und beim Aktualisieren eines Eintrags übernommen', () async {
+      await rememberInternetRoom(
+        InternetRoomEntry(
+          roomCode: 'ABCDE',
+          playerName: 'Anna',
+          reconnectToken: 'token-1',
+          lastSeen: DateTime.now(),
+        ),
+      );
+      expect((await loadInternetRoomHistory()).single.isOver, isFalse);
+
+      await rememberInternetRoom(
+        InternetRoomEntry(
+          roomCode: 'ABCDE',
+          playerName: 'Anna',
+          reconnectToken: 'token-1',
+          lastSeen: DateTime.now(),
+          isOver: true,
+        ),
+      );
+      expect((await loadInternetRoomHistory()).single.isOver, isTrue);
+    });
+
+    test('isOver fehlt bei älteren, vor dieser Funktion gespeicherten Einträgen - gilt dann als false', () async {
+      // Bestehende Nutzer:innen haben schon Einträge ohne 'isOver'-Feld auf
+      // der Platte liegen - das darf beim Deserialisieren nicht crashen.
+      SharedPreferences.setMockInitialValues({
+        'internetRoomHistory':
+            '[{"roomCode":"ABCDE","playerName":"Anna","reconnectToken":"token-1","lastSeen":"${DateTime.now().toIso8601String()}"}]',
+      });
+
+      final entries = await loadInternetRoomHistory();
+      expect(entries.single.isOver, isFalse);
+    });
   });
 }
