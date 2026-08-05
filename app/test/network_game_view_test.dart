@@ -112,12 +112,25 @@ void main() {
       ),
     );
 
+    // Ein zusätzlicher Pump: das erste Zentrieren setzt den
+    // TransformationController erst im Post-Frame-Callback des ersten
+    // Frames, `InteractiveViewer` übernimmt die neue Transformation dann
+    // erst im darauffolgenden Frame - ohne diesen Pump läge `getCenter()`
+    // noch auf der unzentrierten (Rohkoordinaten-)Position.
+    await tester.pump();
+    // Puls- und Tutorial-Overlay liegen über dem Brett und würden die
+    // Drag-Geste sonst abfangen - wie eine echte Nutzerin erst wegtippen.
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.tap(find.text('Los geht’s'));
+    await tester.pump();
+
     final handTile = find.byKey(const ValueKey('hand-0'));
     final boardCell = find.byKey(const ValueKey('board-0-0'));
-    await tester.drag(
-      handTile,
-      tester.getCenter(boardCell) - tester.getCenter(handTile),
-    );
+    final gesture = await tester.startGesture(tester.getCenter(handTile));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.moveTo(tester.getCenter(boardCell));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
     await tester.pump();
 
     expect(find.text('Zug senden'), findsOneWidget);

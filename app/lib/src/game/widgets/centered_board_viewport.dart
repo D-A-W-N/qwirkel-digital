@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 
 /// Ein [InteractiveViewer] (pan-/zoombar, `constrained: false`), das sich
-/// beim allerersten Layout einmalig auf die Mitte seines Inhalts zentriert,
-/// statt wie standardmäßig oben links zu starten - `InteractiveViewer`
-/// selbst kennt ohne einen [TransformationController] nur die
-/// Identitäts-Transformation (Ursprung oben links).
+/// beim allerersten Layout einmalig auf [focalPoint] zentriert, statt wie
+/// standardmäßig oben links zu starten - `InteractiveViewer` selbst kennt
+/// ohne einen [TransformationController] nur die Identitäts-Transformation
+/// (Ursprung oben links).
 ///
-/// Zentriert bewusst nur einmal (beim ersten Mount, nicht bei jeder
-/// Änderung von [contentWidth]/[contentHeight]): sonst würde jede neue
-/// Steinplatzierung - die die Inhaltsgröße meist vergrößert - die Ansicht
-/// unter dem:der Spieler:in wegschieben.
+/// Zentriert bewusst nur einmal (beim ersten Mount): [child] nutzt intern
+/// ein festes Koordinatensystem (siehe `BoardGeometry`), sodass spätere
+/// Steinplatzierungen bereits gezeichnete Inhalte nicht verschieben und ein
+/// erneutes Zentrieren dafür auch nicht nötig ist.
 class CenteredBoardViewport extends StatefulWidget {
   const CenteredBoardViewport({
     super.key,
-    required this.contentWidth,
-    required this.contentHeight,
+    required this.contentSize,
+    required this.focalPoint,
     required this.child,
   });
 
-  final double contentWidth;
-  final double contentHeight;
+  final Size contentSize;
+
+  /// Pixel-Punkt innerhalb von [child] (im festen Koordinatensystem), der
+  /// beim ersten Layout in die Mitte des Viewports gerückt wird.
+  final Offset focalPoint;
   final Widget child;
 
   @override
@@ -36,8 +39,8 @@ class _CenteredBoardViewportState extends State<CenteredBoardViewport> {
       if (!mounted) return;
       final viewportSize = context.size;
       if (viewportSize == null) return;
-      final dx = viewportSize.width / 2 - widget.contentWidth / 2;
-      final dy = viewportSize.height / 2 - widget.contentHeight / 2;
+      final dx = viewportSize.width / 2 - widget.focalPoint.dx;
+      final dy = viewportSize.height / 2 - widget.focalPoint.dy;
       _controller.value = Matrix4.identity()..translateByDouble(dx, dy, 0, 1);
     });
   }
@@ -56,7 +59,11 @@ class _CenteredBoardViewportState extends State<CenteredBoardViewport> {
       minScale: 0.4,
       maxScale: 2.5,
       boundaryMargin: const EdgeInsets.all(400),
-      child: widget.child,
+      child: SizedBox(
+        width: widget.contentSize.width,
+        height: widget.contentSize.height,
+        child: widget.child,
+      ),
     );
   }
 }
