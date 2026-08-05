@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-08-05
+
+- Fixed a bug where restarting a network/LAN game could leave a "ghost" tile on the fresh board (a placement staged but never sent right before the previous game ended) and taking it back would swap in an unrelated tile from the new hand
+
 ## [0.9.10] - 2026-08-05
 
 - The "Zuletzt besuchte Räume" list now marks finished games with a "Beendet" label, and any entry can be removed from the list via a new close button

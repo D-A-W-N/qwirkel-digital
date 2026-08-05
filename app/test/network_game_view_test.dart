@@ -498,4 +498,101 @@ void main() {
       expect(find.textContaining('hat den Zug übergangen'), findsNothing);
     },
   );
+
+  testWidgets(
+    'Ein Neustart der Partie räumt eine noch nicht gesendete Platzierung auf, '
+    'statt sie als Geister-Stein auf dem neuen Brett stehen zu lassen',
+    (tester) async {
+      // Regression: nach "Neues Spiel" landete eine am Ende der vorigen
+      // Partie noch nicht gesendete Platzierung als scheinbar schon
+      // gesetzter Stein auf dem eigentlich leeren neuen Brett - und beim
+      // Zurücknehmen wurde der zugehörige (veraltete) Hand-Index auf die
+      // komplett neue Hand angewendet, was einen falschen Stein aus-/wieder
+      // einblendete.
+      final gameA = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      gameA.currentPlayerIndex = 0;
+      final inProgressSnapshot = GameStateSnapshot.forRecipient(gameA, 0);
+      final handA = inProgressSnapshot.players[0].hand ?? <Tile>[];
+
+      Widget buildView(GameStateSnapshot snapshot, List<Tile> hand) =>
+          MaterialApp(
+            home: NetworkGameView(
+              snapshot: snapshot,
+              ownHand: hand,
+              canInteract: !snapshot.isOver,
+              onSendMove: (placements) async => true,
+              onSendPass: () {},
+              onSendExchange: (tiles) {},
+              isRoomOwner: true,
+              onRestartGame: () {},
+            ),
+          );
+
+      await tester.pumpWidget(buildView(inProgressSnapshot, handA));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pump();
+
+      // Einen Stein platzieren, aber NICHT senden.
+      final handTile = find.byKey(const ValueKey('hand-0'));
+      final boardCell = find.byKey(const ValueKey('board-0-0'));
+      final gesture = await tester.startGesture(tester.getCenter(handTile));
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.moveTo(tester.getCenter(boardCell));
+      await tester.pump(const Duration(milliseconds: 50));
+      await gesture.up();
+      await tester.pump();
+      expect(find.text('Zug senden'), findsOneWidget);
+
+      // Die Partie endet, ohne dass der vorbereitete Zug je gesendet wurde.
+      final overSnapshot = GameStateSnapshot(
+        players: inProgressSnapshot.players,
+        currentPlayerIndex: inProgressSnapshot.currentPlayerIndex,
+        bagRemaining: inProgressSnapshot.bagRemaining,
+        isOver: true,
+        board: inProgressSnapshot.board,
+        yourPlayerIndex: inProgressSnapshot.yourPlayerIndex,
+      );
+      await tester.pumpWidget(buildView(overSnapshot, handA));
+      await tester.pump();
+
+      // Neustart: komplett frisches Spiel mit unabhängig ausgeteilter Hand.
+      final gameB = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      gameB.currentPlayerIndex = 0;
+      final restartedSnapshot = GameStateSnapshot.forRecipient(gameB, 0);
+      final handB = restartedSnapshot.players[0].hand ?? <Tile>[];
+
+      await tester.pumpWidget(buildView(restartedSnapshot, handB));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+
+      // Kein Geister-Stein auf dem neuen, eigentlich leeren Brett - die
+      // Zelle ist wieder ein normales Drop-Ziel.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('board-0-0')),
+          matching: find.byType(DragTarget<int>),
+        ),
+        findsOneWidget,
+      );
+      // Die komplette neue Hand ist sichtbar - keine Lücke durch einen
+      // fälschlich als "platziert" markierten (veralteten) Hand-Index.
+      for (var i = 0; i < handB.length; i++) {
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey('hand-$i')),
+            matching: find.byType(Draggable<int>),
+          ),
+          findsOneWidget,
+        );
+      }
+    },
+  );
 }
