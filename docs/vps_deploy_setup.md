@@ -3,10 +3,10 @@
 Der dedizierte Internet-Multiplayer-Server (`packages/qwirkle_server`) läuft
 als von Coolify verwaltete Application auf dem VPS (Hetzner, bereits mit
 Coolify für ein anderes Projekt im Einsatz). Coolify übernimmt Build,
-Reverse-Proxy und TLS selbst - kein eigener Caddy/Compose-Stack nötig. Die
-folgenden Schritte sind einmalig in der Coolify-Oberfläche nötig, bevor
-`.github/workflows/deploy-server.yml` bei jedem `v*`-Tag automatisch
-deployen kann.
+Reverse-Proxy, TLS und - über sein natives "Auto Deploy on Push" - auch das
+Redeploy bei jedem Merge nach `main` selbst; es gibt keinen separaten
+GitHub-Actions-Deploy-Schritt. Die folgenden Schritte sind einmalig in der
+Coolify-Oberfläche nötig.
 
 ## 1. Neue Application in Coolify anlegen
 
@@ -25,7 +25,18 @@ Coolify-Version): in den Coolify-Docs zum "Docker Compose"-Ressourcentyp
 nachsehen, wie ein abweichender Kontext/Dockerfile-Pfad dort konfiguriert
 wird - im Zweifel in der Coolify-UI direkt nachjustieren.
 
-## 2. Umgebungsvariablen
+## 2. Auto-Deploy aktivieren
+
+In den Application-Settings "Automatic Deployment"/"Auto Deploy on Push"
+für den Branch `main` aktivieren (ggf. den zugehörigen GitHub-Webhook, den
+Coolify dafür selbst am Repo einrichtet, bestätigen). Damit deployed
+Coolify automatisch neu, sobald `main` sich ändert - inklusive jedes
+regulären Release-Merges in diesem Repo.
+
+Ein manuelles Redeploy geht jederzeit über den „Redeploy“-Button in
+Coolify selbst.
+
+## 3. Umgebungsvariablen
 
 In den Application-Settings (überschreiben bei Bedarf die Defaults aus der
 `docker-compose.yml`):
@@ -36,13 +47,13 @@ In den Application-Settings (überschreiben bei Bedarf die Defaults aus der
 | `DATA_DIR`              | Ablageort der Raum-JSON-Dateien               | `/data/rooms`     |
 | `ROOM_RETENTION_DAYS`   | Räume ohne Aktivität werden danach verworfen | `14`              |
 
-## 3. Persistenter Speicher
+## 4. Persistenter Speicher
 
 Ein Volume/Mount auf `/data` in Coolify einrichten (die Compose-Datei
 deklariert dafür bereits das benannte Volume `qwirkle_data`) - sonst gehen
 laufende Partien bei jedem Redeploy verloren.
 
-## 4. Domain
+## 5. Domain
 
 In den Application-Settings die Domain `qgames.streetkidz.duckdns.org`
 eintragen, Ziel-Port `8080`. Coolify richtet den Traefik-Reverse-Proxy und
@@ -53,32 +64,6 @@ unabhängig von Coolify).
 
 Health-Check danach: `https://qgames.streetkidz.duckdns.org/health` sollte
 `ok` liefern.
-
-## 5. Deploy-Webhook für GitHub Actions
-
-In Coolify für diese Application:
-
-- Einen API-Token erzeugen (Coolify → Keys & Tokens / API Tokens).
-- Die Deploy-Webhook-URL der Application kopieren (Coolify zeigt sie im
-  Application-Bereich unter "Webhooks"/"Deploy" an - Format je nach Version
-  z. B. `https://<coolify-host>/api/v1/deploy?uuid=<application-uuid>`).
-
-Im GitHub-Repo unter „Settings → Secrets and variables → Actions“:
-
-| Secret                | Wert                                  |
-| ----------------------- | ---------------------------------------- |
-| `COOLIFY_WEBHOOK_URL`   | Die kopierte Deploy-Webhook-URL         |
-| `COOLIFY_API_TOKEN`     | Der erzeugte API-Token                  |
-
-`deploy-server.yml` ruft diese URL bei jedem `v*`-Tag mit
-`Authorization: Bearer <token>` auf. Weicht das genaue Auth-/URL-Format in
-eurer Coolify-Version davon ab, den `curl`-Aufruf im Workflow entsprechend
-anpassen - das lässt sich nicht ohne Zugriff auf die konkrete
-Coolify-Instanz vorab verifizieren.
-
-Ein manuelles Redeploy (ohne neuen Tag) geht jederzeit über den „Run
-workflow“-Button des `Deploy Server`-Workflows in GitHub Actions, oder
-direkt über den „Redeploy“-Button in Coolify selbst.
 
 ## Wartung
 
