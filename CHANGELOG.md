@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-05
+
+- Fixed network moves that failed for an unexpected reason being silently swallowed (no error, tiles just reappeared reset) - the server now always responds with an error instead of only for a few specific, expected failure kinds
+- Network play no longer clears a staged placement until the server actually confirms the move; a rejected move now stays visible together with a clearly marked error instead of disappearing
+- Placing a tile in network play is now validated live (immediate feedback for e.g. a gap in the line), matching local play, instead of only surfacing after sending
+
 ## [0.9.5] - 2026-08-05
 
 - Fixed the board appearing to vanish while scrolling (the fixed coordinate canvas from 0.9.4's jump fix was generously sized at 64000x64000px, almost entirely empty space around the actual play area - shrunk to a much less easy to get lost in ~19200x19200px)

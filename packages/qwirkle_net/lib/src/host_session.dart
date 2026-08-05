@@ -193,6 +193,16 @@ class HostSession {
       final messageText = e.message.toString();
       _errorController.add(messageText);
       client.send(ErrorMessage(messageText));
+    } catch (e) {
+      // Kein spezifischer, erwarteter Fehlertyp - trotzdem antworten statt
+      // die Nachricht stillschweigend zu verschlucken (sonst bleibt der
+      // Client ohne jede Rückmeldung: seine vorläufige Platzierung ist
+      // bereits lokal geräumt, aber ohne neuen Spielstand oder
+      // Fehlermeldung sieht es aus, als wären die Steine kommentarlos
+      // verschwunden).
+      final messageText = 'Unerwarteter Fehler: $e';
+      _errorController.add(messageText);
+      client.send(ErrorMessage(messageText));
     }
   }
 
@@ -268,6 +278,9 @@ class HostSession {
     } on ArgumentError catch (e) {
       _errorController.add(e.message.toString());
       return null;
+    } catch (e) {
+      _errorController.add('Unerwarteter Fehler: $e');
+      return null;
     }
   }
 
@@ -306,6 +319,8 @@ class HostSession {
       _errorController.add(e.message);
     } on ArgumentError catch (e) {
       _errorController.add(e.message.toString());
+    } catch (e) {
+      _errorController.add('Unerwarteter Fehler: $e');
     }
   }
 
@@ -317,6 +332,8 @@ class HostSession {
       _stateController.add(null);
     } on StateError catch (e) {
       _errorController.add(e.message);
+    } catch (e) {
+      _errorController.add('Unerwarteter Fehler: $e');
     }
   }
 
