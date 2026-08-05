@@ -16,18 +16,26 @@ class NetworkGameView extends StatefulWidget {
     required this.canInteract,
     required this.onSendMove,
     this.statusText,
+    this.errorText,
   });
 
   final GameStateSnapshot snapshot;
   final List<Tile> ownHand;
   final bool canInteract;
 
-  /// Sendet den Zug und liefert, ob er angenommen wurde — bei `false`
-  /// bleibt die vorläufige Platzierung stehen (z. B. damit ein abgelehnter
-  /// Zug sichtbar bleibt, statt kommentarlos zu verschwinden), bei `true`
-  /// wird sie geleert.
+  /// Sendet den Zug. Der Rückgabewert bedeutet nur "erfolgreich
+  /// abgeschickt", NICHT "vom Server bestätigt" - die eigentliche
+  /// Bestätigung kommt asynchron über ein neues [snapshot] (vorläufige
+  /// Platzierungen werden erst dann geleert, siehe [didUpdateWidget]) oder
+  /// als [errorText] zurück.
   final Future<bool> Function(List<TilePlacement> placements) onSendMove;
   final String? statusText;
+
+  /// Vom Server/Host abgelehnter Zug o. ä. - wird auffällig (rot) getrennt
+  /// von [statusText] angezeigt, statt in der neutralen Statuszeile
+  /// womöglich von einem nachfolgenden Routine-Update überschrieben zu
+  /// werden, bevor sie überhaupt bemerkt wird.
+  final String? errorText;
 
   @override
   State<NetworkGameView> createState() => _NetworkGameViewState();
@@ -41,6 +49,14 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   /// erscheint - spiegelt `GameController.handSlots`/`_handIndexByPosition`
   /// im lokalen Spiel.
   final Map<Position, int> _handIndexByPosition = {};
+
+  /// Live-Validierungsfehler beim Platzieren (z. B. Lücke in der Reihe) -
+  /// getrennt von [widget.errorText] (das kommt vom Server, erst NACH dem
+  /// Senden). Wird sofort beim Versuch gesetzt, statt erst nach einem
+  /// Roundtrip zum Server - siehe Nutzer-Feedback "Live Feedback beim
+  /// Platzieren", spiegelt `GameController.stageTile`s Live-Validierung im
+  /// lokalen Spiel.
+  String? _liveError;
   bool _isSending = false;
   bool _showStartPulse = true;
   bool _showTutorial = true;
@@ -62,14 +78,51 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     super.dispose();
   }
 
-  void _stageTile(int handIndex, Position position) {
+  @override
+  void didUpdateWidget(covariant NetworkGameView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Der Zug wurde vom Server übernommen (die Reihe ist von mir
+    // weitergezogen) - die vorläufigen Platzierungen stecken jetzt im
+    // bestätigten Brett und können geleert werden. Bewusst NICHT beim
+    // Senden selbst geleert (siehe `onSendMove`-Doc): würde der Server den
+    // Zug ablehnen oder eine unerwartete Ausnahme werfen, sähen die
+    // gerade gelegten Steine sonst kommentarlos verschwunden aus, ohne
+    // dass klar wird, warum.
+    if (widget.snapshot.currentPlayerIndex != oldWidget.snapshot.currentPlayerIndex &&
+        widget.snapshot.currentPlayerIndex != widget.snapshot.yourPlayerIndex &&
+        _pendingPlacements.isNotEmpty) {
+      _pendingPlacements.clear();
+      _handIndexByPosition.clear();
+    }
+  }
+
+  void _stageTile(Map<Position, Tile> board, int handIndex, Position position) {
     if (!widget.canInteract) return;
     if (handIndex < 0 || handIndex >= widget.ownHand.length) return;
     if (_pendingPlacements.containsKey(position)) return;
     if (_handIndexByPosition.containsValue(handIndex)) return;
+
+    final candidatePlacements = [
+      for (final entry in _pendingPlacements.entries)
+        TilePlacement(position: entry.key, tile: entry.value),
+      TilePlacement(position: position, tile: widget.ownHand[handIndex]),
+    ];
+    final previewBoard = Board()
+      ..apply([
+        for (final entry in board.entries)
+          TilePlacement(position: entry.key, tile: entry.value),
+      ]);
+    try {
+      previewBoard.scorePlacement(candidatePlacements);
+    } on InvalidMoveException catch (e) {
+      setState(() => _liveError = e.message);
+      return;
+    }
+
     setState(() {
       _pendingPlacements[position] = widget.ownHand[handIndex];
       _handIndexByPosition[position] = handIndex;
+      _liveError = null;
     });
   }
 
@@ -77,6 +130,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     setState(() {
       _pendingPlacements.remove(position);
       _handIndexByPosition.remove(position);
+      _liveError = null;
     });
   }
 
@@ -98,7 +152,11 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         for (final entry in _pendingPlacements.entries)
           TilePlacement(position: entry.key, tile: entry.value),
       ]);
-    } on InvalidMoveException {
+    } catch (_) {
+      // Reine Vorschau - eine (un)gültige Platzierung entscheidet
+      // `_stageTile` bereits beim Ablegen; hier defensiv gegen jede
+      // Ausnahme statt nur die erwartete `InvalidMoveException`, damit ein
+      // unerwarteter Randfall niemals den ganzen Build-Vorgang mitreißt.
       return null;
     }
   }
@@ -184,7 +242,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     board: board,
                     pendingPlacements: _pendingPlacements,
                     canInteract: widget.canInteract,
-                    onDropTile: _stageTile,
+                    onDropTile: (handIndex, position) => _stageTile(board, handIndex, position),
                     onUnstage: _unstageTile,
                   ),
                   if (_showStartPulse && !widget.snapshot.isOver)
@@ -259,6 +317,35 @@ class _NetworkGameViewState extends State<NetworkGameView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if ((_liveError ?? widget.errorText) != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (_liveError ?? widget.errorText)!,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if (widget.statusText != null && widget.statusText!.isNotEmpty) ...[
                     Container(
                       width: double.infinity,
@@ -367,14 +454,17 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                               for (final entry in _pendingPlacements.entries)
                                 TilePlacement(position: entry.key, tile: entry.value),
                             ];
-                            final accepted = await widget.onSendMove(placements);
-                            setState(() {
-                              if (accepted) {
-                                _pendingPlacements.clear();
-                                _handIndexByPosition.clear();
-                              }
-                              _isSending = false;
-                            });
+                            // Bewusst NICHT hier leeren: "gesendet" heißt bei
+                            // einer Netzwerkpartie noch nicht "vom Server
+                            // bestätigt" - das passiert erst in
+                            // `didUpdateWidget`, sobald ein neuer Spielstand
+                            // die Reihe tatsächlich weiterzieht. So bleibt
+                            // die Platzierung sichtbar stehen, falls der
+                            // Server den Zug ablehnt oder gar nicht
+                            // antwortet, statt kommentarlos zu verschwinden.
+                            await widget.onSendMove(placements);
+                            if (!mounted) return;
+                            setState(() => _isSending = false);
                           }
                         : null,
                     child: const Text('Zug senden'),

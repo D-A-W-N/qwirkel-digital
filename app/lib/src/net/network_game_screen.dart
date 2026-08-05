@@ -30,6 +30,12 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   GameStateSnapshot? _snapshot;
   List<Tile> _ownHand = const [];
 
+  /// Getrennt von [_status]: Fehler bekommen eine auffällige, rote Anzeige
+  /// statt in der neutralen Statuszeile unterzugehen (z. B. wenn direkt
+  /// danach ein routinemäßiges Status-Update denselben Text überschreiben
+  /// würde) - siehe Nutzer-Feedback "Fehler besser visualisieren".
+  String? _errorText;
+
   bool get _isLan => widget.config.mode == 'lan';
 
   /// Ob diese Seite die Steuerung zum Starten/Neustarten der Partie zeigen
@@ -136,7 +142,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     });
     host.errors.listen((message) {
       if (!mounted) return;
-      setState(() => _status = 'Fehler: $message');
+      setState(() => _errorText = message);
     });
     host.onStateChanged.listen((_) {
       if (!mounted) return;
@@ -146,6 +152,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         _snapshot = snapshot;
         _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
         _status = 'Host-Zustand aktualisiert';
+        _errorText = null;
       });
     });
     host.onGameStarted.listen((started) {
@@ -254,13 +261,12 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         _gameStarted = true;
         _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
         _status = 'Spielzustand empfangen (${snapshot.players.length} Spieler)';
+        _errorText = null;
       });
     });
     session.errors.listen((message) {
       if (!mounted) return;
-      setState(() {
-        _status = 'Fehler: $message';
-      });
+      setState(() => _errorText = message);
     });
   }
 
@@ -338,12 +344,18 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   Future<bool> _sendMove(List<TilePlacement> placements) async {
     if (placements.isEmpty) return false;
     if (_clientSession != null) {
-      setState(() => _status = 'Zug wird an den Host gesendet...');
+      setState(() {
+        _status = 'Zug wird an den Host gesendet...';
+        _errorText = null;
+      });
       _clientSession!.sendMove(placements);
       return true;
     }
     if (_hostSession != null) {
-      setState(() => _status = 'Host führt den Zug aus...');
+      setState(() {
+        _status = 'Host führt den Zug aus...';
+        _errorText = null;
+      });
       final score = _hostSession!.playHostMove(placements);
       return score != null;
     }
@@ -359,6 +371,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         canInteract: _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex,
         onSendMove: _sendMove,
         statusText: _status,
+        errorText: _errorText,
       );
     }
 
