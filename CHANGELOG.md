@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-08-05
+
+- Changed house rule: the game no longer ends the instant one player empties their hand while the bag is empty - it now continues until every player's hand is empty (or nobody can move), so players who still have tiles get to keep playing; everyone who empties their hand still gets the usual 6-point bonus, not just the first
+- Added pass and exchange to network multiplayer (previously only placing tiles was possible), matching local play
+
 ## [0.9.6] - 2026-08-05
 
 - Fixed network moves that failed for an unexpected reason being silently swallowed (no error, tiles just reappeared reset) - the server now always responds with an error instead of only for a few specific, expected failure kinds
