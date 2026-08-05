@@ -58,6 +58,12 @@ class RoomSession {
   QwirkleGame? _game;
   DateTime lastActivity = DateTime.now();
 
+  /// Was beim letzten Zug passiert ist - für ein Live-"was hat die andere
+  /// Person gerade gemacht"-Feedback bei den Clients, siehe
+  /// [GameStateSnapshot.lastMove]. Bewusst nicht persistiert (rein
+  /// transiente Live-Anzeige, kein Teil des eigentlichen Spielzustands).
+  LastMoveInfo? _lastMove;
+
   /// Wird nach jeder zustandsändernden Aktion aufgerufen (Beitritt, Zug,
   /// Spielstart, Trennung, ...), damit die aufrufende Schicht
   /// (`qwirkle_server`) den Raum bei Bedarf persistieren kann. Bewusst
@@ -150,7 +156,13 @@ class RoomSession {
     final game = _game;
     if (game != null && seat.playerIndex != null) {
       seat.send(
-        GameStateMessage(GameStateSnapshot.forRecipient(game, seat.playerIndex!)),
+        GameStateMessage(
+          GameStateSnapshot.forRecipient(
+            game,
+            seat.playerIndex!,
+            lastMove: _lastMove,
+          ),
+        ),
       );
     } else {
       _broadcastLobby();
@@ -173,13 +185,27 @@ class RoomSession {
         if (game == null || seat.playerIndex == null) return;
         if (message is MoveMessage) {
           _requireCurrentPlayer(seat);
-          game.playTiles(message.placements);
+          final score = game.playTiles(message.placements);
+          _lastMove = LastMoveInfo(
+            playerIndex: seat.playerIndex!,
+            kind: LastMoveKind.placed,
+            placements: message.placements,
+            score: score,
+          );
         } else if (message is ExchangeMessage) {
           _requireCurrentPlayer(seat);
           game.exchangeTiles(message.tiles);
+          _lastMove = LastMoveInfo(
+            playerIndex: seat.playerIndex!,
+            kind: LastMoveKind.exchanged,
+          );
         } else if (message is PassMessage) {
           _requireCurrentPlayer(seat);
           game.passTurn();
+          _lastMove = LastMoveInfo(
+            playerIndex: seat.playerIndex!,
+            kind: LastMoveKind.passed,
+          );
         } else {
           return;
         }
@@ -225,6 +251,7 @@ class RoomSession {
     final players = [for (final s in seats) Player(id: s.playerId, name: s.name)];
     final game = QwirkleGame(players: players);
     _game = game;
+    _lastMove = null;
     for (var i = 0; i < seats.length; i++) {
       seats[i].playerIndex = i;
     }
@@ -238,6 +265,7 @@ class RoomSession {
     }
     final players = [for (final s in seats) Player(id: s.playerId, name: s.name)];
     _game = QwirkleGame(players: players);
+    _lastMove = null;
     for (var i = 0; i < seats.length; i++) {
       seats[i].playerIndex = i;
     }
@@ -257,7 +285,11 @@ class RoomSession {
     for (final s in seats) {
       final index = s.playerIndex;
       if (index == null) continue;
-      s.send(GameStateMessage(GameStateSnapshot.forRecipient(game, index)));
+      s.send(
+        GameStateMessage(
+          GameStateSnapshot.forRecipient(game, index, lastMove: _lastMove),
+        ),
+      );
     }
   }
 

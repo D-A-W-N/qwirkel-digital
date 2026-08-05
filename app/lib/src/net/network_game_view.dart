@@ -189,6 +189,23 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
   }
 
+  /// Kurze, menschenlesbare Zusammenfassung eines fremden Zugs - für ein
+  /// Live-"was hat die andere Person gerade gemacht"-Feedback, spiegelt
+  /// `lastBotSummary` im lokalen Spiel.
+  String _describeLastMove(LastMoveInfo move, String playerName) {
+    switch (move.kind) {
+      case LastMoveKind.placed:
+        final count = move.placements.length;
+        final tileWord = count == 1 ? 'Stein' : 'Steine';
+        final pointWord = move.score == 1 ? 'Punkt' : 'Punkte';
+        return '$playerName hat $count $tileWord platziert (${move.score} $pointWord).';
+      case LastMoveKind.exchanged:
+        return '$playerName hat Steine getauscht.';
+      case LastMoveKind.passed:
+        return '$playerName hat den Zug übergangen.';
+    }
+  }
+
   String _statusText(Map<Position, Tile> board, bool isMyTurn) {
     if (widget.snapshot.isOver) {
       return 'Die Partie ist beendet. Die Punkte werden nun ausgewertet.';
@@ -307,6 +324,20 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         placement.position: placement.tile,
     };
 
+    // Nur fremde Züge hervorheben/zusammenfassen - die eigenen kennt man ja
+    // schon, da man sie selbst gerade platziert hat.
+    final lastMove = widget.snapshot.lastMove;
+    final lastMoveByOther =
+        lastMove != null && lastMove.playerIndex != widget.snapshot.yourPlayerIndex
+        ? lastMove
+        : null;
+    final lastMovePositions = lastMoveByOther?.kind == LastMoveKind.placed
+        ? {for (final p in lastMoveByOther!.placements) p.position}
+        : const <Position>{};
+    final lastMoveSummary = lastMoveByOther == null
+        ? null
+        : _describeLastMove(lastMoveByOther, players[lastMoveByOther.playerIndex].name);
+
     // Hand-"Slots": bereits vorläufig platzierte Steine erscheinen als
     // Lücke statt doppelt (in der Hand UND auf dem Brett) - siehe
     // `GameController.handSlots` im lokalen Spiel für dasselbe Muster.
@@ -351,6 +382,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     canInteract: widget.canInteract,
                     onDropTile: (handIndex, position) => _stageTile(board, handIndex, position),
                     onUnstage: _unstageTile,
+                    highlightedPositions: lastMovePositions,
                   ),
                   if (_showStartPulse && !widget.snapshot.isOver)
                     Positioned.fill(
@@ -424,6 +456,29 @@ class _NetworkGameViewState extends State<NetworkGameView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (lastMoveSummary != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              lastMoveSummary,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   if ((_liveError ?? widget.errorText) != null) ...[
                     Container(
                       width: double.infinity,
@@ -622,6 +677,7 @@ class _BoardSurface extends StatelessWidget {
     required this.canInteract,
     required this.onDropTile,
     required this.onUnstage,
+    this.highlightedPositions = const {},
   });
 
   final Map<Position, Tile> board;
@@ -629,6 +685,11 @@ class _BoardSurface extends StatelessWidget {
   final bool canInteract;
   final void Function(int handIndex, Position position) onDropTile;
   final void Function(Position position) onUnstage;
+
+  /// Zuletzt von einer ANDEREN Person platzierte Steine - kurz hervorgehoben,
+  /// damit sichtbar ist, was gerade passiert ist (spiegelt die
+  /// Bot-Zug-Hervorhebung im lokalen Spiel).
+  final Set<Position> highlightedPositions;
 
   static const double cellSize = 64;
 
@@ -691,6 +752,7 @@ class _BoardSurface extends StatelessWidget {
                 canInteract: canInteract,
                 onDropTile: onDropTile,
                 onUnstage: onUnstage,
+                highlighted: highlightedPositions.contains(position),
               ),
             ),
         ],
@@ -708,6 +770,7 @@ class _BoardCell extends StatelessWidget {
     required this.canInteract,
     required this.onDropTile,
     required this.onUnstage,
+    this.highlighted = false,
   });
 
   final Position position;
@@ -716,12 +779,20 @@ class _BoardCell extends StatelessWidget {
   final bool canInteract;
   final void Function(int handIndex, Position position) onDropTile;
   final void Function(Position position) onUnstage;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
     final existing = existingTile;
     if (existing != null) {
-      return Center(child: TileView(tile: existing, size: _BoardSurface.cellSize - 16));
+      return Center(
+        child: TileView(
+          tile: existing,
+          size: _BoardSurface.cellSize - 16,
+          highlighted: highlighted,
+          highlightColor: Colors.amber,
+        ),
+      );
     }
 
     final pending = pendingTile;
