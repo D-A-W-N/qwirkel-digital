@@ -42,7 +42,7 @@ class InternetRoomEntry {
 Future<List<InternetRoomEntry>> loadInternetRoomHistory() async {
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString(_prefsKey);
-  if (raw == null) return const [];
+  if (raw == null) return [];
   final list = jsonDecode(raw) as List<dynamic>;
   final entries = [
     for (final e in list) InternetRoomEntry.fromJson(e as Map<String, dynamic>),
