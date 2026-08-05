@@ -17,6 +17,8 @@ class NetworkGameView extends StatefulWidget {
     required this.onSendMove,
     required this.onSendPass,
     required this.onSendExchange,
+    required this.isRoomOwner,
+    required this.onRestartGame,
     this.statusText,
     this.errorText,
   });
@@ -39,6 +41,15 @@ class NetworkGameView extends StatefulWidget {
 
   /// Tauscht die übergebenen Handsteine gegen neue aus dem Beutel.
   final void Function(List<Tile> tiles) onSendExchange;
+
+  /// Ob diese Person die Partie neu starten darf (Raumersteller:in im
+  /// Internet-Modus bzw. immer im LAN-Modus, sofern man der Host ist) -
+  /// steuert, ob der "Neues Spiel"-Button im Partie-Ende-Overlay angezeigt
+  /// wird.
+  final bool isRoomOwner;
+
+  /// Startet die Partie mit denselben Teilnehmer:innen neu.
+  final void Function() onRestartGame;
   final String? statusText;
 
   /// Vom Server/Host abgelehnter Zug o. ä. - wird auffällig (rot) getrennt
@@ -223,6 +234,93 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
     if (!isMyTurn) return 'Warte auf den nächsten Zug.';
     return 'Du bist am Zug. Ziehe einen Stein auf das Brett.';
+  }
+
+  /// Zentrales Overlay am Partie-Ende: Ergebnis + (nur für die Person mit
+  /// Owner-Rechten) die Möglichkeit, eine neue Partie zu starten. Ersetzt
+  /// die vormals nur inline in der Statusleiste angezeigte Ergebnisliste,
+  /// bei der die Zug-/Tausch-/Aussetzen-Buttons für die Person, die den
+  /// letzten Stein gelegt hat, danach fälschlich weiter bedienbar blieben.
+  Widget _buildGameOverOverlay() {
+    final players = widget.snapshot.players;
+    final highestScore = players.map((p) => p.score).reduce((a, b) => a > b ? a : b);
+    final winners = players.where((p) => p.score == highestScore).toList();
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.55),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Card(
+              margin: const EdgeInsets.all(16),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                // Scrollbar statt Overflow, falls der verfügbare Platz für
+                // die Ergebnisliste nicht reicht (viele Spieler:innen oder
+                // ein niedriges Fenster).
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.celebration_outlined,
+                        size: 40,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Partie beendet',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        winners.length == 1
+                            ? '${winners.first.name} gewinnt!'
+                            : '${winners.map((p) => p.name).join(' & ')} gewinnen gemeinsam!',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      for (final player in players)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(player.name),
+                              Text(
+                                '${player.score} ${player.score == 1 ? 'Punkt' : 'Punkte'}',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 20),
+                      if (widget.isRoomOwner)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: widget.onRestartGame,
+                            icon: const Icon(Icons.restart_alt),
+                            label: const Text('Neues Spiel'),
+                          ),
+                        )
+                      else
+                        Text(
+                          'Warte, bis der/die Raumersteller:in eine neue Partie startet.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Aussetzen ist nur möglich, wenn der Beutel leer ist - solange noch
@@ -446,6 +544,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                         ),
                       ),
                     ),
+                  if (widget.snapshot.isOver) _buildGameOverOverlay(),
                 ],
               ),
             ),
@@ -575,43 +674,10 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     ),
                     child: Text(_statusText(board, isMyTurn)),
                   ),
-                  if (widget.snapshot.isOver) ...[
+                  if (!widget.snapshot.isOver) ...[
                     const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ergebnis',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          ...widget.snapshot.players.asMap().entries.map((entry) {
-                            final player = entry.value;
-                            final isWinner = widget.snapshot.players
-                                .map((p) => p.score)
-                                .reduce((a, b) => a > b ? a : b) == player.score &&
-                                widget.snapshot.players
-                                    .where((p) => p.score == player.score)
-                                    .length ==
-                                    1;
-                            return Text(
-                              '${player.name}: ${player.score} ${player.score == 1 ? 'Punkt' : 'Punkte'}${isWinner ? ' (Gewinner)' : ''}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
+                    _buildActionButtons(isMyTurn),
                   ],
-                  const SizedBox(height: 8),
-                  _buildActionButtons(isMyTurn),
                 ],
               ),
             ),
