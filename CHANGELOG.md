@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-08-05
+
+- Fixed the board occasionally jumping mid-game on an unrelated tap (tile positions were recomputed relative to a dynamic bounding-box minimum that shifted whenever the board's extent changed - now uses a fixed coordinate origin)
+- Network multiplayer's board now expands immediately while staging a placement during your own turn, instead of only after the move is confirmed by the server
+- Network multiplayer now shows a live points preview for the staged placement, matching local play
+- Fixed a host losing access to their own room after leaving it - the "zuletzt besuchte Räume" list is now shown regardless of the hosting/joining toggle
+
 ## [0.9.3] - 2026-08-05
 
 - Fixed the board always opening scrolled to its top-left corner instead of centered (local and network play)
