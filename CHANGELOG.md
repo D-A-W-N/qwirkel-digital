@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-08-05
+
+- Fixed the board always opening scrolled to its top-left corner instead of centered (local and network play)
+- Network multiplayer now places tiles via drag-and-drop, matching local play, instead of tap-to-select-then-tap-to-place
+
 ## [0.9.2] - 2026-08-05
 
 - Fixed hosting/joining an internet room crashing before showing the invite code the very first time (no room history saved yet triggered an "unmodifiable list" crash)

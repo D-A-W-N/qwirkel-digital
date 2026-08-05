@@ -112,8 +112,12 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const ValueKey('hand-0')));
-    await tester.tap(find.byKey(const ValueKey('board-0-0')));
+    final handTile = find.byKey(const ValueKey('hand-0'));
+    final boardCell = find.byKey(const ValueKey('board-0-0'));
+    await tester.drag(
+      handTile,
+      tester.getCenter(boardCell) - tester.getCenter(handTile),
+    );
     await tester.pump();
 
     expect(find.text('Zug senden'), findsOneWidget);
