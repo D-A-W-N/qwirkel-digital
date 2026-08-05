@@ -77,8 +77,17 @@ class QwirkleGame {
     _consecutivePasses = 0;
 
     if (player.hand.isEmpty && bag.isEmpty) {
+      // Hausregel: die Partie endet NICHT sofort, sobald eine Person ihre
+      // Hand bei leerem Beutel leert - die übrigen Spieler:innen spielen
+      // regulär weiter (die leere Hand kann bis zum Partie-Ende nur noch
+      // passen, siehe `passTurn`s Deadlock-Erkennung). Erst wenn dadurch
+      // ALLE Hände leer sind, ist die Partie tatsächlich zu Ende - jede
+      // Person, die ihre Hand vollständig leert, bekommt trotzdem den
+      // Bonus, nicht nur die erste.
       points += 6;
-      isOver = true;
+      if (players.every((p) => p.hand.isEmpty)) {
+        isOver = true;
+      }
     }
     player.score += points;
     _advanceTurn();

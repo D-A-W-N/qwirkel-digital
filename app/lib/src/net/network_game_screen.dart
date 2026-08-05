@@ -362,6 +362,39 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     return false;
   }
 
+  void _sendPass() {
+    if (_clientSession != null) {
+      setState(() {
+        _status = 'Aussetzen wird gesendet...';
+        _errorText = null;
+      });
+      _clientSession!.sendPass();
+    } else if (_hostSession != null) {
+      setState(() {
+        _status = 'Host setzt aus...';
+        _errorText = null;
+      });
+      _hostSession!.passHostTurn();
+    }
+  }
+
+  void _sendExchange(List<Tile> tiles) {
+    if (tiles.isEmpty) return;
+    if (_clientSession != null) {
+      setState(() {
+        _status = 'Tausch wird gesendet...';
+        _errorText = null;
+      });
+      _clientSession!.sendExchange(tiles);
+    } else if (_hostSession != null) {
+      setState(() {
+        _status = 'Host tauscht Steine...';
+        _errorText = null;
+      });
+      _hostSession!.exchangeHostTiles(tiles);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_snapshot != null) {
@@ -370,6 +403,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         ownHand: _ownHand,
         canInteract: _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex,
         onSendMove: _sendMove,
+        onSendPass: _sendPass,
+        onSendExchange: _sendExchange,
         statusText: _status,
         errorText: _errorText,
       );

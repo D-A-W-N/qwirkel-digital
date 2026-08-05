@@ -15,6 +15,8 @@ class NetworkGameView extends StatefulWidget {
     required this.ownHand,
     required this.canInteract,
     required this.onSendMove,
+    required this.onSendPass,
+    required this.onSendExchange,
     this.statusText,
     this.errorText,
   });
@@ -29,6 +31,14 @@ class NetworkGameView extends StatefulWidget {
   /// Platzierungen werden erst dann geleert, siehe [didUpdateWidget]) oder
   /// als [errorText] zurück.
   final Future<bool> Function(List<TilePlacement> placements) onSendMove;
+
+  /// Setzt den Zug aus (nur möglich, wenn der Beutel leer ist - solange
+  /// noch Steine im Beutel sind, kann stattdessen getauscht werden,
+  /// spiegelt dieselbe Einschränkung wie im lokalen Spiel).
+  final void Function() onSendPass;
+
+  /// Tauscht die übergebenen Handsteine gegen neue aus dem Beutel.
+  final void Function(List<Tile> tiles) onSendExchange;
   final String? statusText;
 
   /// Vom Server/Host abgelehnter Zug o. ä. - wird auffällig (rot) getrennt
@@ -62,6 +72,11 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   bool _showTutorial = true;
   Timer? _startPulseTimer;
 
+  /// Tausch-Modus: Handsteine werden per Antippen statt per Ziehen
+  /// ausgewählt - spiegelt `HandView`s `exchangeMode` im lokalen Spiel.
+  bool _exchangeMode = false;
+  final Set<int> _selectedForExchange = {};
+
   @override
   void initState() {
     super.initState();
@@ -89,11 +104,24 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // gerade gelegten Steine sonst kommentarlos verschwunden aus, ohne
     // dass klar wird, warum.
     if (widget.snapshot.currentPlayerIndex != oldWidget.snapshot.currentPlayerIndex &&
-        widget.snapshot.currentPlayerIndex != widget.snapshot.yourPlayerIndex &&
-        _pendingPlacements.isNotEmpty) {
-      _pendingPlacements.clear();
-      _handIndexByPosition.clear();
+        widget.snapshot.currentPlayerIndex != widget.snapshot.yourPlayerIndex) {
+      if (_pendingPlacements.isNotEmpty) {
+        _pendingPlacements.clear();
+        _handIndexByPosition.clear();
+      }
+      if (_exchangeMode || _selectedForExchange.isNotEmpty) {
+        _exchangeMode = false;
+        _selectedForExchange.clear();
+      }
     }
+  }
+
+  void _toggleExchangeSelection(int handIndex) {
+    setState(() {
+      if (!_selectedForExchange.remove(handIndex)) {
+        _selectedForExchange.add(handIndex);
+      }
+    });
   }
 
   void _stageTile(Map<Position, Tile> board, int handIndex, Position position) {
@@ -178,6 +206,85 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     }
     if (!isMyTurn) return 'Warte auf den nächsten Zug.';
     return 'Du bist am Zug. Ziehe einen Stein auf das Brett.';
+  }
+
+  /// Aussetzen ist nur möglich, wenn der Beutel leer ist - solange noch
+  /// Steine im Beutel sind, kann stattdessen getauscht werden. Spiegelt
+  /// dieselbe Einschränkung wie `canPass` im lokalen Spiel
+  /// (`game_screen.dart`).
+  Widget _buildActionButtons(bool isMyTurn) {
+    final canAct = widget.canInteract && isMyTurn && !_isSending;
+    final canPass = canAct && widget.snapshot.bagRemaining == 0 && _pendingPlacements.isEmpty;
+
+    return Wrap(
+      spacing: 8,
+      alignment: WrapAlignment.center,
+      children: [
+        if (!_exchangeMode) ...[
+          FilledButton(
+            onPressed: canAct && _pendingPlacements.isNotEmpty
+                ? () async {
+                    setState(() => _isSending = true);
+                    final placements = [
+                      for (final entry in _pendingPlacements.entries)
+                        TilePlacement(position: entry.key, tile: entry.value),
+                    ];
+                    // Bewusst NICHT hier leeren: "gesendet" heißt bei einer
+                    // Netzwerkpartie noch nicht "vom Server bestätigt" -
+                    // das passiert erst in `didUpdateWidget`, sobald ein
+                    // neuer Spielstand die Reihe tatsächlich weiterzieht.
+                    // So bleibt die Platzierung sichtbar stehen, falls der
+                    // Server den Zug ablehnt oder gar nicht antwortet,
+                    // statt kommentarlos zu verschwinden.
+                    await widget.onSendMove(placements);
+                    if (!mounted) return;
+                    setState(() => _isSending = false);
+                  }
+                : null,
+            child: const Text('Zug senden'),
+          ),
+          OutlinedButton(
+            onPressed: widget.canInteract && _pendingPlacements.isNotEmpty && !_isSending
+                ? () => setState(() {
+                    _pendingPlacements.clear();
+                    _handIndexByPosition.clear();
+                    _liveError = null;
+                  })
+                : null,
+            child: const Text('Zurücknehmen'),
+          ),
+        ] else
+          FilledButton(
+            onPressed: canAct && _selectedForExchange.isNotEmpty
+                ? () {
+                    final tiles = [
+                      for (final index in _selectedForExchange) widget.ownHand[index],
+                    ];
+                    widget.onSendExchange(tiles);
+                    setState(() {
+                      _exchangeMode = false;
+                      _selectedForExchange.clear();
+                    });
+                  }
+                : null,
+            child: const Text('Steine tauschen'),
+          ),
+        TextButton(
+          onPressed: canAct
+              ? () => setState(() {
+                  _exchangeMode = !_exchangeMode;
+                  _selectedForExchange.clear();
+                })
+              : null,
+          child: Text(_exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
+        ),
+        if (canPass)
+          OutlinedButton(
+            onPressed: widget.onSendPass,
+            child: const Text('Aussetzen'),
+          ),
+      ],
+    );
   }
 
   @override
@@ -392,6 +499,9 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                             index: index,
                             tile: handSlots[index],
                             canInteract: widget.canInteract,
+                            exchangeMode: _exchangeMode,
+                            selectedForExchange: _selectedForExchange.contains(index),
+                            onToggleExchange: () => _toggleExchangeSelection(index),
                           ),
                       ],
                     ),
@@ -446,29 +556,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: widget.canInteract && isMyTurn && _pendingPlacements.isNotEmpty && !_isSending
-                        ? () async {
-                            setState(() => _isSending = true);
-                            final placements = [
-                              for (final entry in _pendingPlacements.entries)
-                                TilePlacement(position: entry.key, tile: entry.value),
-                            ];
-                            // Bewusst NICHT hier leeren: "gesendet" heißt bei
-                            // einer Netzwerkpartie noch nicht "vom Server
-                            // bestätigt" - das passiert erst in
-                            // `didUpdateWidget`, sobald ein neuer Spielstand
-                            // die Reihe tatsächlich weiterzieht. So bleibt
-                            // die Platzierung sichtbar stehen, falls der
-                            // Server den Zug ablehnt oder gar nicht
-                            // antwortet, statt kommentarlos zu verschwinden.
-                            await widget.onSendMove(placements);
-                            if (!mounted) return;
-                            setState(() => _isSending = false);
-                          }
-                        : null,
-                    child: const Text('Zug senden'),
-                  ),
+                  _buildActionButtons(isMyTurn),
                 ],
               ),
             ),
@@ -485,11 +573,17 @@ class _HandSlot extends StatelessWidget {
     required this.index,
     required this.tile,
     required this.canInteract,
+    required this.exchangeMode,
+    required this.selectedForExchange,
+    required this.onToggleExchange,
   });
 
   final int index;
   final Tile? tile;
   final bool canInteract;
+  final bool exchangeMode;
+  final bool selectedForExchange;
+  final VoidCallback onToggleExchange;
 
   @override
   Widget build(BuildContext context) {
@@ -499,6 +593,12 @@ class _HandSlot extends StatelessWidget {
     }
     if (!canInteract) {
       return TileView(tile: currentTile);
+    }
+    if (exchangeMode) {
+      return GestureDetector(
+        onTap: onToggleExchange,
+        child: TileView(tile: currentTile, highlighted: selectedForExchange),
+      );
     }
     return Draggable<int>(
       data: index,
