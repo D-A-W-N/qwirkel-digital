@@ -22,6 +22,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
   final _inviteCodeController = TextEditingController();
   bool _isHosting = false;
   String _connectionMode = 'lan';
+  bool _showServerUrlField = false;
   List<InternetRoomEntry> _recentRooms = const [];
   final List<String> _tips = [
     'Hoste ein Spiel, wenn du die Partie starten willst.',
@@ -132,13 +133,24 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                 ),
               ),
             ] else ...[
-              TextField(
-                controller: _serverUrlController,
-                decoration: const InputDecoration(
-                  labelText: 'Server-Adresse',
-                  border: OutlineInputBorder(),
+              if (_showServerUrlField) ...[
+                TextField(
+                  controller: _serverUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'Server-Adresse',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+              ] else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => setState(() => _showServerUrlField = true),
+                    icon: const Icon(Icons.settings, size: 18),
+                    label: const Text('Andere Server-Adresse verwenden'),
+                  ),
+                ),
               const SizedBox(height: 12),
               if (_isHosting)
                 const Text(
