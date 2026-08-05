@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-08-05
+
+- Fixed internet play occasionally freezing after a dropped connection (e.g. when the server backend redeploys mid-game) - the client/room owner now automatically retries reconnecting with a growing backoff instead of requiring a manual leave-and-rejoin
+
 ## [0.9.14] - 2026-08-05
 
 - Added a dismissible "Du bist am Zug" dialog whenever it becomes your turn, in both local (hotseat) and network play, so a turn change is never missed - replaces the old one-shot local game-start snackbar
