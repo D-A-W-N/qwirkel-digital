@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-08-05
+
+- Fixed hosting/joining an internet room crashing before showing the invite code the very first time (no room history saved yet triggered an "unmodifiable list" crash)
+- The internet server address is now hidden by default behind a "andere Server-Adresse verwenden" toggle instead of always showing an editable field
+
 ## [0.9.1] - 2026-08-05
 
 - Fixed a shutdown race in the internet-server backend where force-closing the HTTP server could trigger disconnect-handling writes that arrived after the server had already reported itself fully shut down (relevant for redeploys, caught by qwirkle_server's own macOS CI run)
