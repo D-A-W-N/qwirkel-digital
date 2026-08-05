@@ -114,8 +114,20 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // Zug ablehnen oder eine unerwartete Ausnahme werfen, sähen die
     // gerade gelegten Steine sonst kommentarlos verschwunden aus, ohne
     // dass klar wird, warum.
-    if (widget.snapshot.currentPlayerIndex != oldWidget.snapshot.currentPlayerIndex &&
-        widget.snapshot.currentPlayerIndex != widget.snapshot.yourPlayerIndex) {
+    final turnAdvancedAwayFromMe =
+        widget.snapshot.currentPlayerIndex != oldWidget.snapshot.currentPlayerIndex &&
+        widget.snapshot.currentPlayerIndex != widget.snapshot.yourPlayerIndex;
+    // Regression: eine neu gestartete Partie (Übergang isOver -> nicht mehr
+    // isOver) bringt ein komplett frisches Brett/Hand vom Server, aber ohne
+    // diesen Fall leerte sich der lokale Platzierungs-Zustand nicht mit -
+    // eine am Ende der vorigen Partie noch nicht gesendete Platzierung (z. B.
+    // kurz bevor das Zug-Ende-Overlay die Buttons sperrt) blieb als
+    // "Geister-Stein" auf dem neuen, eigentlich leeren Brett stehen. Beim
+    // Zurücknehmen wurde dann `_handIndexByPosition`s Hand-Index (aus der
+    // ALTEN Hand) auf die KOMPLETT NEUE Hand angewendet und blendete dort
+    // einen falschen, unzusammenhängenden Stein aus/wieder ein.
+    final restarted = oldWidget.snapshot.isOver && !widget.snapshot.isOver;
+    if (turnAdvancedAwayFromMe || restarted) {
       if (_pendingPlacements.isNotEmpty) {
         _pendingPlacements.clear();
         _handIndexByPosition.clear();
@@ -124,6 +136,9 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         _exchangeMode = false;
         _selectedForExchange.clear();
       }
+    }
+    if (restarted) {
+      _liveError = null;
     }
   }
 
