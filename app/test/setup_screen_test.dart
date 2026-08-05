@@ -17,6 +17,55 @@ void main() {
     expect(find.text('Bilde Reihen aus Farben oder Formen.'), findsOneWidget);
   });
 
+  testWidgets(
+    'Der Update-Bereich im Einstellungen-Sheet bleibt bei großer '
+    'Systemschrift/kleinem Fenster erreichbar (scrollbar)',
+    (tester) async {
+      // Simuliert die Situation eines sehbehinderten Nutzers mit stark
+      // vergrößerter Systemschrift auf einem eher kleinen Fenster - vorher
+      // war das Sheet nicht scrollbar und der Update-Bereich (weit unten in
+      // der Liste) dadurch weder sichtbar noch antippbar.
+      // Breit genug, damit die (von diesem Fix unabhängigen) horizontalen
+      // Zeilen der Spieler-Konfiguration bei größerer Schrift nicht
+      // überlaufen - schmal in der Höhe ist hier der relevante Engpass.
+      tester.view.physicalSize = const Size(1400, 500);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(1.6)),
+              child: child!,
+            ),
+            home: const SetupScreen(),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Nach Updates suchen'),
+        200,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('settingsSheetScrollView')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(find.text('Nach Updates suchen'), findsOneWidget);
+
+      // Muss auch tatsächlich antippbar sein, nicht nur im Baum vorhanden.
+      await tester.tap(find.text('Nach Updates suchen'));
+      await tester.pump();
+    },
+  );
+
   test('App-Settings speichern Animations- und Tipps-Status', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
