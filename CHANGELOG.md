@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.14] - 2026-08-05
+
+- Added a dismissible "Du bist am Zug" dialog whenever it becomes your turn, in both local (hotseat) and network play, so a turn change is never missed - replaces the old one-shot local game-start snackbar
+
 ## [0.9.13] - 2026-08-05
 
 - The board now gets the full screen by default in both local and network play - hand/buttons/status live in a new collapsible bottom panel instead of a fixed block, reclaiming most of the screen for players using large system text/zoom. The panel auto-expands whenever it becomes your turn and is always manually toggleable (tap or drag the handle)
