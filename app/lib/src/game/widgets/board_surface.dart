@@ -135,7 +135,11 @@ class _BoardCell extends StatelessWidget {
           tile: existing,
           size: tileSize,
           highlighted: highlighted,
-          highlightColor: Colors.amber,
+          // Pink/Magenta statt Amber: Amber liegt farblich zu nah an der
+          // orangen Qwirkle-Steinfarbe und ging dort optisch unter -
+          // Nutzer-Feedback, die Hervorhebung fremder Züge sei nicht
+          // auffällig genug. Pink kommt in keiner Stein-Palette vor.
+          highlightColor: Colors.pinkAccent,
         ),
       );
     }
