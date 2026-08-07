@@ -57,6 +57,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,3 +97,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Nutzt vorerst dasselbe (generische Flutter-Platzhalter-)Icon wie die
+# Desktop-Builds, statt eines eigens gestalteten Qwirkle-Icons - konsistent
+# mit dem Bestand, aber als bewusst einfaches (nicht adaptives) Icon, weil
+# das Quellbild bereits eine eigene weiße Karte + Schatten mitbringt, die
+# sich mit einer zusätzlichen adaptiven Android-Maske sonst doppeln würde.
+flutter_launcher_icons:
+  android: true
+  image_path: "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
+  min_sdk_android: 21

@@ -1,0 +1,4 @@
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=qwirkle
+storeFile=/absolute/path/to/qwirkle-release.jks
