@@ -5,7 +5,7 @@ Qwirkle Digital ist eine native Desktop-Anwendung für das bekannte Legespiel Qw
 - Einzelspieler gegen KI
 - lokalem Pass-and-Play
 - Online-Multiplayer über eine einfache Host/Join-Session
-- einer Flutter-basierten Desktop-UI für macOS, Linux und Windows
+- einer Flutter-basierten UI für macOS, Linux, Windows und Android
 
 ## Projektstruktur
 
@@ -36,6 +36,7 @@ cd app
 flutter run -d macos
 flutter run -d linux
 flutter run -d windows
+flutter run -d android  # angeschlossenes Gerät/Emulator, Android SDK vorausgesetzt
 ```
 
 ## Tests und Qualität
@@ -57,6 +58,20 @@ flutter build macos --release
 flutter build linux --release
 flutter build windows --release
 ```
+
+## Android-Build
+
+```sh
+cd app
+flutter build apk --release
+```
+
+Ohne `android/key.properties` (lokal nie eingecheckt, siehe `android/key.properties.example`)
+fällt der Release-Build automatisch auf die Debug-Signatur zurück - für einen "echten",
+update-kompatibel signierten Build muss diese Datei auf den unter `android/app/build.gradle.kts`
+beschriebenen Release-Keystore zeigen. Der offizielle CI-Build (`.github/workflows/desktop-build.yml`)
+setzt diese Datei aus Repo-Secrets zusammen (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`).
 
 ## Branching und Releases
 
@@ -80,11 +95,12 @@ Internet-Partien laufen über einen dedizierten, dauerhaft laufenden Server (`pa
 
 ## Installation (fertige Builds)
 
-Fertige Builds für macOS, Linux und Windows gibt es unter [GitHub Releases](https://github.com/D-A-W-N/qwirkel-digital/releases) — jeweils als Zip/Tar.gz, kein Installer.
+Fertige Builds für macOS, Linux, Windows und Android gibt es unter [GitHub Releases](https://github.com/D-A-W-N/qwirkel-digital/releases).
 
 - **macOS**: Die App ist nicht signiert/notarisiert. Beim ersten Start blockiert Gatekeeper sie als "nicht verifizierter Entwickler" — über Rechtsklick → Öffnen (oder Systemeinstellungen → Datenschutz & Sicherheit) trotzdem starten.
 - **Linux/Windows**: Archiv entpacken, ausführbare Datei starten.
-- **Updates**: Auf macOS, Linux und Windows prüft die App selbst auf neue Versionen und kann sich per Klick aktualisieren (Einstellungen → "Nach Updates suchen").
+- **Android**: `qwirkle-digital-android.apk` herunterladen und installieren (Sideload, kein Play-Store-Eintrag) — Android fragt beim ersten Mal nach der Erlaubnis, Apps aus dieser Quelle zu installieren.
+- **Updates**: Auf macOS, Linux und Windows prüft die App selbst auf neue Versionen und kann sich per Klick aktualisieren (Einstellungen → "Nach Updates suchen"). Auf Android gibt es das noch nicht — neue Versionen dort manuell als APK nachladen.
 
 ## Beitragen
 
