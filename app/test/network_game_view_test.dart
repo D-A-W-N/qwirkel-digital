@@ -5,32 +5,42 @@ import 'package:qwirkle_digital/src/net/network_game_view.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 void main() {
-  testWidgets('NetworkGameView zeigt einen Status-Text an', (tester) async {
-    final game = QwirkleGame(players: [
-      Player(id: 'p1', name: 'Alice'),
-      Player(id: 'p2', name: 'Bob'),
-    ]);
-    final snapshot = GameStateSnapshot.forRecipient(game, 0);
-    final hand = snapshot.players[0].hand ?? <Tile>[];
+  testWidgets(
+    'NetworkGameView zeigt einen übergebenen Status-Text als Toast an, der '
+    'von selbst wieder verschwindet',
+    (tester) async {
+      final game = QwirkleGame(players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ]);
+      final snapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = snapshot.players[0].hand ?? <Tile>[];
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: NetworkGameView(
-          snapshot: snapshot,
-          ownHand: hand,
-          canInteract: true,
-          statusText: 'Spiel wird synchronisiert',
-          onSendMove: (placements) async => true,
-          onSendPass: () {},
-          onSendExchange: (tiles) {},
-          isRoomOwner: false,
-          onRestartGame: () {},
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: snapshot,
+            ownHand: hand,
+            canInteract: true,
+            statusText: 'Spiel wird synchronisiert',
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
         ),
-      ),
-    );
+      );
+      await tester.pump();
 
-    expect(find.text('Spiel wird synchronisiert'), findsOneWidget);
-  });
+      expect(find.text('Spiel wird synchronisiert'), findsOneWidget);
+      // Anders als das vormalige dauerhaft stehende Banner ist das jetzt
+      // eine echte SnackBar - die blendet sich, anders als der alte Banner,
+      // von selbst wieder aus (eingebaute Dismiss-Logik) - Nutzer-Feedback:
+      // "Benachrichtigungen verschwinden nicht während des Spiels".
+      expect(find.byType(SnackBar), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'Die Statuszeile nennt beim Warten den Namen der Person, die am Zug ist, '
@@ -307,9 +317,9 @@ void main() {
       await dragToBoard('hand-1', 'board-2-0');
 
       expect(find.textContaining('lückenlos'), findsOneWidget);
-      // Nur EIN Stein wurde tatsächlich platziert - der Punktevorschau-Text
+      // Nur EIN Stein wurde tatsächlich platziert - das Punktevorschau-Badge
       // würde bei zwei erfolgreich platzierten Steinen anders aussehen.
-      expect(find.textContaining('Dieser Zug: 1 Punkt'), findsOneWidget);
+      expect(find.text('+1 Punkt'), findsOneWidget);
     },
   );
 
@@ -467,7 +477,8 @@ void main() {
   );
 
   testWidgets(
-    'Zeigt eine Zusammenfassung des letzten fremden Zugs an, aber nicht für den eigenen',
+    'Zeigt eine Zusammenfassung des letzten fremden Zugs als Toast an, aber '
+    'nicht für den eigenen',
     (tester) async {
       final game = QwirkleGame(players: [
         Player(id: 'p1', name: 'Alice'),
@@ -475,6 +486,26 @@ void main() {
       ]);
       game.currentPlayerIndex = 0;
       final baseSnapshot = GameStateSnapshot.forRecipient(game, 0);
+
+      Widget buildView(GameStateSnapshot snapshot) => MaterialApp(
+        home: NetworkGameView(
+          snapshot: snapshot,
+          ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
+          canInteract: true,
+          onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
+        ),
+      );
+
+      // Erst ohne fremden Zug mounten - der Toast wird über eine ÄNDERUNG
+      // ausgelöst (siehe didUpdateWidget), nicht über den Anfangszustand
+      // (sonst würde beim Verbinden/Neuladen jedes Mal ein Toast über einen
+      // womöglich längst veralteten Zug aus der Vergangenheit erscheinen).
+      await tester.pumpWidget(buildView(baseSnapshot));
+      await tester.pump();
 
       final snapshotWithOthersMove = GameStateSnapshot(
         players: baseSnapshot.players,
@@ -485,21 +516,8 @@ void main() {
         yourPlayerIndex: baseSnapshot.yourPlayerIndex,
         lastMove: const LastMoveInfo(playerIndex: 1, kind: LastMoveKind.exchanged),
       );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkGameView(
-            snapshot: snapshotWithOthersMove,
-            ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
-            canInteract: true,
-            onSendMove: (placements) async => true,
-            onSendPass: () {},
-            onSendExchange: (tiles) {},
-            isRoomOwner: false,
-            onRestartGame: () {},
-          ),
-        ),
-      );
+      await tester.pumpWidget(buildView(snapshotWithOthersMove));
+      await tester.pump();
 
       expect(find.text('Bob hat Steine getauscht.'), findsOneWidget);
 
@@ -512,21 +530,8 @@ void main() {
         yourPlayerIndex: baseSnapshot.yourPlayerIndex,
         lastMove: const LastMoveInfo(playerIndex: 0, kind: LastMoveKind.passed),
       );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkGameView(
-            snapshot: snapshotWithOwnMove,
-            ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
-            canInteract: true,
-            onSendMove: (placements) async => true,
-            onSendPass: () {},
-            onSendExchange: (tiles) {},
-            isRoomOwner: false,
-            onRestartGame: () {},
-          ),
-        ),
-      );
+      await tester.pumpWidget(buildView(snapshotWithOwnMove));
+      await tester.pump();
 
       expect(find.textContaining('hat den Zug übergangen'), findsNothing);
     },
