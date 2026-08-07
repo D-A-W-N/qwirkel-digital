@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-08-07
+
+- Added Android as a supported platform: signed release APKs are now built and published to GitHub Releases alongside the desktop builds. Sideload only for now (no Play Store listing), and the in-app updater doesn't cover Android yet - re-download the APK manually for new versions
+
 ## [0.9.17] - 2026-08-06
 
 - Fixed the settings sheet not being fully visible/scrollable at large system text scale, which made the update controls unreachable
