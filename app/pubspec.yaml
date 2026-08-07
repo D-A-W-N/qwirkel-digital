@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.9.17+1
+version: 0.9.18+1
 
 environment:
   sdk: ^3.12.2
@@ -57,6 +57,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,3 +97,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Nutzt vorerst dasselbe (generische Flutter-Platzhalter-)Icon wie die
+# Desktop-Builds, statt eines eigens gestalteten Qwirkle-Icons - konsistent
+# mit dem Bestand, aber als bewusst einfaches (nicht adaptives) Icon, weil
+# das Quellbild bereits eine eigene weiße Karte + Schatten mitbringt, die
+# sich mit einer zusätzlichen adaptiven Android-Maske sonst doppeln würde.
+flutter_launcher_icons:
+  android: true
+  image_path: "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png"
+  min_sdk_android: 21
