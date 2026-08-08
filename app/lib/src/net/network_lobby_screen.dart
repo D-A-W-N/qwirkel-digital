@@ -18,8 +18,11 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
   final _portController = TextEditingController(text: '4040');
   final _nameController = TextEditingController(text: 'Spieler');
   String? _errorText;
-  final _serverUrlController = TextEditingController(text: kDefaultInternetServerUrl);
+  final _serverUrlController = TextEditingController(
+    text: kDefaultInternetServerUrl,
+  );
   final _inviteCodeController = TextEditingController();
+  final _roomNameController = TextEditingController();
   bool _isHosting = false;
   String _connectionMode = 'lan';
   bool _showServerUrlField = false;
@@ -57,6 +60,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
     _nameController.dispose();
     _serverUrlController.dispose();
     _inviteCodeController.dispose();
+    _roomNameController.dispose();
     super.dispose();
   }
 
@@ -65,7 +69,9 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
     final settings = ref.watch(appSettingsProvider);
     final tips = settings.tipsEnabled
         ? _tips
-        : ['Tipps sind deaktiviert. Du kannst sie in den Einstellungen wieder aktivieren.'];
+        : [
+            'Tipps sind deaktiviert. Du kannst sie in den Einstellungen wieder aktivieren.',
+          ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Netzwerk-Lobby')),
@@ -160,11 +166,20 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                   ),
                 ),
               const SizedBox(height: 12),
-              if (_isHosting)
+              if (_isHosting) ...[
                 const Text(
                   'Der Einladungscode wird nach dem Erstellen des Raums angezeigt und kann dann geteilt werden.',
-                )
-              else
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _roomNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Raumname (optional)',
+                    hintText: 'z. B. Samstagsrunde',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ] else
                 TextField(
                   controller: _inviteCodeController,
                   decoration: const InputDecoration(
@@ -197,22 +212,41 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                       ),
                       title: Row(
                         children: [
-                          Text(entry.roomCode),
+                          // Name statt Code als primäre Bezeichnung - der
+                          // Code allein war kaum wiederzuerkennen. Fällt bei
+                          // älteren, vor diesem Feature gespeicherten
+                          // Einträgen auf den Code zurück.
+                          Text(entry.roomName ?? entry.roomCode),
                           if (entry.isOver) ...[
                             const SizedBox(width: 8),
                             Chip(
                               label: const Text('Beendet'),
-                              labelStyle: Theme.of(context).textTheme.labelSmall,
+                              labelStyle: Theme.of(
+                                context,
+                              ).textTheme.labelSmall,
                               visualDensity: VisualDensity.compact,
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                               padding: EdgeInsets.zero,
                             ),
                           ],
                         ],
                       ),
-                      subtitle: Text(
-                        'als ${entry.playerName} · zuletzt ${_formatLastSeen(entry.lastSeen)}',
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Code: ${entry.roomCode} · als ${entry.playerName} · '
+                            'zuletzt ${_formatLastSeen(entry.lastSeen)}',
+                          ),
+                          if (entry.playerNames.isNotEmpty)
+                            Text(
+                              'Mit ${entry.playerNames.join(', ')}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
                       ),
+                      isThreeLine: entry.playerNames.isNotEmpty,
                       trailing: IconButton(
                         icon: const Icon(Icons.close),
                         tooltip: 'Aus der Historie entfernen',
@@ -275,6 +309,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                     name: _nameController.text,
                     serverUrl: _serverUrlController.text,
                     inviteCode: _inviteCodeController.text,
+                    roomName: _roomNameController.text,
                   );
                   setState(() => _errorText = null);
                   Navigator.of(context).push(
@@ -296,17 +331,19 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            ...tips.map((tip) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.lightbulb_outline, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(tip)),
-                ],
+            ...tips.map(
+              (tip) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(tip)),
+                  ],
+                ),
               ),
-            )),
+            ),
           ],
         ),
       ),

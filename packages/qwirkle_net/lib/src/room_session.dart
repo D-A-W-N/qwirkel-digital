@@ -54,6 +54,13 @@ class RoomSeat {
 /// Partie ist, die sich über mehrere Tage ziehen kann.
 class RoomSession {
   final String roomCode;
+
+  /// Frei vergebener Name des Raums (z. B. "Samstagsrunde") - damit sich
+  /// der Raum in der lokalen Historie wiederfinden lässt, statt nur über
+  /// den kaum merkbaren Code (siehe `internet_room_history.dart`,
+  /// Nutzer-Feedback "Räume sollten auch Namen bekommen"). Fällt auf
+  /// "Raum $roomCode" zurück, falls beim Erstellen keiner angegeben wurde.
+  final String roomName;
   final List<RoomSeat> seats = [];
   QwirkleGame? _game;
   DateTime lastActivity = DateTime.now();
@@ -83,10 +90,14 @@ class RoomSession {
   /// beitretende Spieler:innen eine bereits vergebene Id bekommen.
   RoomSession({
     required this.roomCode,
+    String? roomName,
     this.onChanged,
     QwirkleGame? initialGame,
     int nextPlayerNumber = 1,
-  }) : _game = initialGame,
+  }) : roomName = (roomName == null || roomName.trim().isEmpty)
+           ? 'Raum $roomCode'
+           : roomName.trim(),
+       _game = initialGame,
        _nextPlayerNumber = nextPlayerNumber;
 
   bool get isGameStarted => _game != null;
@@ -160,6 +171,7 @@ class RoomSession {
         roomCode: roomCode,
         reconnectToken: seat.reconnectToken,
         isOwner: seat.isOwner,
+        roomName: roomName,
       ),
     );
 

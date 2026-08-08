@@ -12,13 +12,15 @@ class NetworkConnectionConfig {
     required String name,
     required String serverUrl,
     required String inviteCode,
+    String roomName = '',
     this.reconnectToken,
   }) : mode = mode.trim(),
        host = host.trim(),
        port = port.trim(),
        name = name.trim(),
        serverUrl = serverUrl.trim(),
-       inviteCode = inviteCode.trim() {
+       inviteCode = inviteCode.trim(),
+       roomName = roomName.trim() {
     if (this.mode.isEmpty) {
       throw ArgumentError('Mode must not be empty');
     }
@@ -41,6 +43,13 @@ class NetworkConnectionConfig {
   /// Nur `mode == 'internet'`: Raum-Code, dem beigetreten werden soll
   /// (leer beim Hosten - der Server vergibt dann einen neuen Code).
   final String inviteCode;
+
+  /// Nur `mode == 'internet'` und [isHosting]: frei vergebener Name für
+  /// einen neu zu erstellenden Raum (z. B. "Samstagsrunde"), damit er sich
+  /// später in der Raum-Historie leichter wiederfinden lässt als nur über
+  /// den Code - Nutzer-Feedback "Räume sollten auch Namen bekommen". Leer
+  /// lässt den Server einen Fallback-Namen vergeben.
+  final String roomName;
 
   /// Nur `mode == 'internet'`: aus der lokalen Raum-Historie übernommenes
   /// Reconnect-Token, um nach einer Trennung denselben Sitzplatz

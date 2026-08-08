@@ -133,5 +133,35 @@ void main() {
       final entries = await loadInternetRoomHistory();
       expect(entries.single.isOver, isFalse);
     });
+
+    test('roomName und playerNames werden gespeichert und geladen', () async {
+      await rememberInternetRoom(
+        InternetRoomEntry(
+          roomCode: 'ABCDE',
+          playerName: 'Anna',
+          reconnectToken: 'token-1',
+          lastSeen: DateTime.now(),
+          roomName: 'Samstagsrunde',
+          playerNames: const ['Ben', 'Clara'],
+        ),
+      );
+
+      final entry = (await loadInternetRoomHistory()).single;
+      expect(entry.roomName, 'Samstagsrunde');
+      expect(entry.playerNames, ['Ben', 'Clara']);
+    });
+
+    test('roomName/playerNames fehlen bei älteren Einträgen - gelten dann als null/leer', () async {
+      // Dieselbe Rückwärtskompatibilität wie bei 'isOver': ältere,
+      // gespeicherte Einträge kennen die neuen Felder noch nicht.
+      SharedPreferences.setMockInitialValues({
+        'internetRoomHistory':
+            '[{"roomCode":"ABCDE","playerName":"Anna","reconnectToken":"token-1","lastSeen":"${DateTime.now().toIso8601String()}"}]',
+      });
+
+      final entry = (await loadInternetRoomHistory()).single;
+      expect(entry.roomName, isNull);
+      expect(entry.playerNames, isEmpty);
+    });
   });
 }
