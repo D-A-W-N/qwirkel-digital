@@ -63,67 +63,87 @@ void main() {
       await server.close();
     });
 
-    test('Erster Beitritt ohne Raum-Code erstellt einen neuen Raum, Ersteller:in wird Owner', () async {
-      final anna = await _connect(port, name: 'Anna');
-      addTearDown(anna.close);
+    test(
+      'Erster Beitritt ohne Raum-Code erstellt einen neuen Raum, Ersteller:in wird Owner',
+      () async {
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
 
-      expect(anna.roomCode, isNotNull);
-      expect(anna.reconnectToken, isNotNull);
-      expect(anna.isRoomOwner, isTrue);
-      expect(server.manager.room(anna.roomCode!), isNotNull);
-    });
+        expect(anna.roomCode, isNotNull);
+        expect(anna.reconnectToken, isNotNull);
+        expect(anna.isRoomOwner, isTrue);
+        expect(server.manager.room(anna.roomCode!), isNotNull);
+      },
+    );
 
-    test('Zweite:r Spieler:in tritt per Raum-Code bei, beide sehen die Lobby', () async {
-      final anna = await _connect(port, name: 'Anna');
-      addTearDown(anna.close);
+    test(
+      'Zweite:r Spieler:in tritt per Raum-Code bei, beide sehen die Lobby',
+      () async {
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
 
-      final lobbyFuture = anna.lobbyUpdates.firstWhere((l) => l.players.length == 2);
-      final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
-      addTearDown(ben.close);
-      final lobby = await lobbyFuture;
+        final lobbyFuture = anna.lobbyUpdates.firstWhere(
+          (l) => l.players.length == 2,
+        );
+        final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+        addTearDown(ben.close);
+        final lobby = await lobbyFuture;
 
-      expect(lobby.players.map((p) => p.name), containsAll(['Anna', 'Ben']));
-      expect(lobby.canStart, isTrue);
-      expect(ben.isRoomOwner, isFalse);
-    });
+        expect(lobby.players.map((p) => p.name), containsAll(['Anna', 'Ben']));
+        expect(lobby.canStart, isTrue);
+        expect(ben.isRoomOwner, isFalse);
+      },
+    );
 
-    test('Unbekannter Raum-Code liefert einen Fehler statt einer Verbindung', () async {
-      final socket = await WebSocket.connect('ws://127.0.0.1:$port');
-      final session = ClientSession();
-      addTearDown(session.close);
-      final errorFuture = session.errors.first;
+    test(
+      'Unbekannter Raum-Code liefert einen Fehler statt einer Verbindung',
+      () async {
+        final socket = await WebSocket.connect('ws://127.0.0.1:$port');
+        final session = ClientSession();
+        addTearDown(session.close);
+        final errorFuture = session.errors.first;
 
-      unawaited(
-        session
-            .connectVia(
-              WebSocketTransport(socket),
-              name: 'Geist',
-              roomCode: 'NOPE1',
-            )
-            .catchError((_) {}),
-      );
+        unawaited(
+          session
+              .connectVia(
+                WebSocketTransport(socket),
+                name: 'Geist',
+                roomCode: 'NOPE1',
+              )
+              .catchError((_) {}),
+        );
 
-      final error = await errorFuture;
-      expect(error, contains('Unbekannter'));
-    });
+        final error = await errorFuture;
+        expect(error, contains('Unbekannter'));
+      },
+    );
 
-    test('Owner startet die Partie, beide Seiten bekommen einen zugeschnittenen Zustand', () async {
-      final anna = await _connect(port, name: 'Anna');
-      addTearDown(anna.close);
-      final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
-      addTearDown(ben.close);
+    test(
+      'Owner startet die Partie, beide Seiten bekommen einen zugeschnittenen Zustand',
+      () async {
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
+        final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+        addTearDown(ben.close);
 
-      final annaState = anna.stateUpdates.first;
-      final benState = ben.stateUpdates.first;
-      anna.sendStartGame();
+        final annaState = anna.stateUpdates.first;
+        final benState = ben.stateUpdates.first;
+        anna.sendStartGame();
 
-      final annaSnapshot = await annaState;
-      final benSnapshot = await benState;
+        final annaSnapshot = await annaState;
+        final benSnapshot = await benState;
 
-      expect(annaSnapshot.yourPlayerIndex, isNot(benSnapshot.yourPlayerIndex));
-      expect(annaSnapshot.players[annaSnapshot.yourPlayerIndex].hand, isNotNull);
-      expect(annaSnapshot.players[benSnapshot.yourPlayerIndex].hand, isNull);
-    });
+        expect(
+          annaSnapshot.yourPlayerIndex,
+          isNot(benSnapshot.yourPlayerIndex),
+        );
+        expect(
+          annaSnapshot.players[annaSnapshot.yourPlayerIndex].hand,
+          isNotNull,
+        );
+        expect(annaSnapshot.players[benSnapshot.yourPlayerIndex].hand, isNull);
+      },
+    );
 
     test('Nur der Owner darf die Partie starten', () async {
       final anna = await _connect(port, name: 'Anna');
@@ -197,7 +217,82 @@ void main() {
       },
     );
 
-    test('Reconnect mit gültigem Token übernimmt denselben Sitzplatz', () async {
+    test(
+      'Eine getrennte Person wird für die anderen live als nicht verbunden '
+      'markiert, statt dass die Partie kommentarlos zu warten scheint',
+      () async {
+        // Regression: `_handleDisconnect` setzte vorher nur die lokale
+        // `RoomSeat.connected`-Flagge, ohne die anderen Sitzplätze über
+        // einen neuen Spielstand zu informieren - Anna hätte nie erfahren,
+        // dass Ben getrennt ist.
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
+        final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+
+        final annaState = anna.stateUpdates.first;
+        anna.sendStartGame();
+        await annaState;
+
+        final annaSeesDisconnect = anna.stateUpdates.firstWhere(
+          (s) => !s.players[1].connected,
+        );
+        await ben.close();
+
+        final snapshot = await annaSeesDisconnect;
+        expect(snapshot.players[1].connected, isFalse);
+        expect(snapshot.players[0].connected, isTrue);
+      },
+    );
+
+    test(
+      'Reconnect mit gültigem Token übernimmt denselben Sitzplatz',
+      () async {
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
+        final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+
+        final annaState = anna.stateUpdates.first;
+        final firstBenState = ben.stateUpdates.first;
+        anna.sendStartGame();
+        await annaState;
+        await firstBenState;
+
+        final benToken = ben.reconnectToken!;
+        final benRoomCode = ben.roomCode!;
+        await ben.close();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        final benAgain = await _connect(
+          port,
+          name: 'Ben',
+          roomCode: benRoomCode,
+          reconnectToken: benToken,
+        );
+        addTearDown(benAgain.close);
+        // Der Zustand nach Reconnect kommt als eigene Nachricht NACH dem
+        // Welcome, auf dessen Empfang `connectVia` bereits zurückkehrt -
+        // explizit abwarten statt sofort `latestSnapshot` zu prüfen.
+        await benAgain.stateUpdates.first;
+
+        expect(benAgain.latestSnapshot, isNotNull);
+        final room = server.manager.room(anna.roomCode!)!;
+        // Kein zusätzlicher dritter Sitzplatz entstanden.
+        expect(room.seats.length, 2);
+        expect(
+          room.seats
+              .where((s) => s.reconnectToken == benToken)
+              .single
+              .connected,
+          isTrue,
+        );
+      },
+    );
+
+    test('Ein Reconnect wird auch den anderen Sitzplätzen live mitgeteilt, '
+        'nicht nur dem zurückkehrenden', () async {
+      // Regression: vorher wurde nach einem erfolgreichen Reconnect der
+      // neue Zustand nur an den zurückkehrenden Sitzplatz selbst
+      // gesendet - Anna hätte nie erfahren, dass Ben wieder verbunden ist.
       final anna = await _connect(port, name: 'Anna');
       addTearDown(anna.close);
       final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
@@ -208,11 +303,17 @@ void main() {
       await annaState;
       await firstBenState;
 
+      final annaSeesDisconnect = anna.stateUpdates.firstWhere(
+        (s) => !s.players[1].connected,
+      );
       final benToken = ben.reconnectToken!;
       final benRoomCode = ben.roomCode!;
       await ben.close();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await annaSeesDisconnect;
 
+      final annaSeesReconnect = anna.stateUpdates.firstWhere(
+        (s) => s.players[1].connected,
+      );
       final benAgain = await _connect(
         port,
         name: 'Ben',
@@ -220,19 +321,9 @@ void main() {
         reconnectToken: benToken,
       );
       addTearDown(benAgain.close);
-      // Der Zustand nach Reconnect kommt als eigene Nachricht NACH dem
-      // Welcome, auf dessen Empfang `connectVia` bereits zurückkehrt -
-      // explizit abwarten statt sofort `latestSnapshot` zu prüfen.
-      await benAgain.stateUpdates.first;
 
-      expect(benAgain.latestSnapshot, isNotNull);
-      final room = server.manager.room(anna.roomCode!)!;
-      // Kein zusätzlicher dritter Sitzplatz entstanden.
-      expect(room.seats.length, 2);
-      expect(
-        room.seats.where((s) => s.reconnectToken == benToken).single.connected,
-        isTrue,
-      );
+      final snapshot = await annaSeesReconnect;
+      expect(snapshot.players[1].connected, isTrue);
     });
   });
 }

@@ -195,7 +195,22 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex &&
         oldWidget.snapshot.currentPlayerIndex !=
             widget.snapshot.currentPlayerIndex;
-    if (becameMyTurn) {
+    // Andersrum gilt dasselbe für eine zurückkehrende Person: die Partie
+    // überspringt ihren Zug bei einer Trennung bewusst NICHT (siehe
+    // RoomSession-Doku), es kann also schon vor dem Reconnect ihr Zug
+    // gewesen sein und bleibt es danach unverändert - `currentPlayerIndex`
+    // ändert sich dann gar nicht, `becameMyTurn` bliebe fälschlich `false`.
+    // Erkennbar stattdessen am Wechsel von `canInteract: false -> true`
+    // OHNE eigentlichen Zugwechsel (reines Reconnect-Signal - ein normaler
+    // Zugwechsel triggert bereits über `becameMyTurn` oben und würde sonst
+    // doppelt anzeigen). Nutzer-Feedback: "andersrum sollte der Spieler,
+    // der am Zug ist, auch drauf hingewiesen werden".
+    final regainedTurnAfterReconnect =
+        !becameMyTurn &&
+        widget.canInteract &&
+        !oldWidget.canInteract &&
+        widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex;
+    if (becameMyTurn || regainedTurnAfterReconnect) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showTurnDialog(context, message: 'Du bist jetzt am Zug.');
@@ -367,7 +382,19 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // Nennt den Namen, statt nur generisch "auf den nächsten Zug" zu warten -
     // übernimmt damit die einzige Information, die vorher exklusiv in der
     // jetzt entfernten separaten "Aktueller Zug: X"-Zeile stand.
-    if (!isMyTurn) return 'Warte auf $currentPlayerName.';
+    if (!isMyTurn) {
+      // Die Partie überspringt eine getrennte Person nicht automatisch
+      // (siehe RoomSession-Doku) - ohne diesen Hinweis sähe das Warten
+      // kommentarlos wie ein hängendes Spiel aus, statt erkennbar auf eine
+      // Reconnect zu warten. Nutzer-Feedback: Benachrichtigung, wenn die
+      // Person, die am Zug ist, nicht (mehr) im Spiel ist.
+      final currentPlayerConnected =
+          widget.snapshot.players[widget.snapshot.currentPlayerIndex].connected;
+      if (!currentPlayerConnected) {
+        return '$currentPlayerName ist nicht verbunden – die Partie wartet auf eine Rückkehr.';
+      }
+      return 'Warte auf $currentPlayerName.';
+    }
     return 'Du bist am Zug. Ziehe einen Stein auf das Brett.';
   }
 
@@ -605,6 +632,9 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                 players: players,
                 currentIndex: widget.snapshot.currentPlayerIndex,
                 scores: [for (final p in widget.snapshot.players) p.score],
+                connected: [
+                  for (final p in widget.snapshot.players) p.connected,
+                ],
               ),
               Expanded(
                 child: Stack(

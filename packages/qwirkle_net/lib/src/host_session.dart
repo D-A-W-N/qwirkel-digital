@@ -93,7 +93,9 @@ class HostSession {
       _serverSocket!.listen((socket) => acceptTransport(TcpTransport(socket)));
       _statusController.add('Host lauscht auf Port ${_serverSocket!.port}');
     } on SocketException catch (error) {
-      _errorController.add('Host konnte nicht gestartet werden: ${error.message}');
+      _errorController.add(
+        'Host konnte nicht gestartet werden: ${error.message}',
+      );
       _statusController.add('Host konnte nicht gestartet werden');
       rethrow;
     }
@@ -157,7 +159,11 @@ class HostSession {
         client.playerIndex = _clients.length;
         client.send(
           GameStateMessage(
-            GameStateSnapshot.forRecipient(_game!, client.playerIndex!),
+            GameStateSnapshot.forRecipient(
+              _game!,
+              client.playerIndex!,
+              disconnectedPlayerIndexes: _disconnectedPlayerIndexes,
+            ),
           ),
         );
       }
@@ -273,7 +279,12 @@ class HostSession {
       if (index == null) continue;
       c.send(
         GameStateMessage(
-          GameStateSnapshot.forRecipient(game, index, lastMove: _lastMove),
+          GameStateSnapshot.forRecipient(
+            game,
+            index,
+            lastMove: _lastMove,
+            disconnectedPlayerIndexes: _disconnectedPlayerIndexes,
+          ),
         ),
       );
     }
@@ -341,7 +352,10 @@ class HostSession {
   void exchangeHostTiles(List<Tile> tiles) {
     try {
       _game!.exchangeTiles(tiles);
-      _lastMove = const LastMoveInfo(playerIndex: 0, kind: LastMoveKind.exchanged);
+      _lastMove = const LastMoveInfo(
+        playerIndex: 0,
+        kind: LastMoveKind.exchanged,
+      );
       _skipDisconnectedPlayers();
       _broadcastState();
       _stateController.add(null);
@@ -374,7 +388,12 @@ class HostSession {
   GameStateSnapshot? snapshotForHost() {
     final game = _game;
     if (game == null) return null;
-    return GameStateSnapshot.forRecipient(game, 0, lastMove: _lastMove);
+    return GameStateSnapshot.forRecipient(
+      game,
+      0,
+      lastMove: _lastMove,
+      disconnectedPlayerIndexes: _disconnectedPlayerIndexes,
+    );
   }
 
   Future<void> close() async {
