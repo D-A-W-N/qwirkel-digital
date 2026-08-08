@@ -54,6 +54,13 @@ class PlayerView {
   final int handCount;
   final List<Tile>? hand;
 
+  /// Ob der Netzwerk-Client dieser Person aktuell verbunden ist - Bots und
+  /// LAN-Partien (`HostSession`) haben nie einen getrennten Sitzplatz, daher
+  /// der Default `true`. Internet-Räume (`RoomSession`) setzen dies aus
+  /// `RoomSeat.connected`, damit sichtbar wird, wenn jemand die Verbindung
+  /// verloren hat, statt dass die Partie kommentarlos zu warten scheint.
+  final bool connected;
+
   const PlayerView({
     required this.id,
     required this.name,
@@ -61,17 +68,22 @@ class PlayerView {
     required this.isBot,
     required this.handCount,
     this.hand,
+    this.connected = true,
   });
 
-  factory PlayerView.of(Player player, {required bool includeHand}) =>
-      PlayerView(
-        id: player.id,
-        name: player.name,
-        score: player.score,
-        isBot: player.isBot,
-        handCount: player.hand.length,
-        hand: includeHand ? List.unmodifiable(player.hand) : null,
-      );
+  factory PlayerView.of(
+    Player player, {
+    required bool includeHand,
+    bool connected = true,
+  }) => PlayerView(
+    id: player.id,
+    name: player.name,
+    score: player.score,
+    isBot: player.isBot,
+    handCount: player.hand.length,
+    hand: includeHand ? List.unmodifiable(player.hand) : null,
+    connected: connected,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -80,6 +92,7 @@ class PlayerView {
     'isBot': isBot,
     'handCount': handCount,
     if (hand != null) 'hand': tilesToJson(hand!),
+    if (!connected) 'connected': connected,
   };
 
   factory PlayerView.fromJson(Map<String, dynamic> json) => PlayerView(
@@ -91,6 +104,7 @@ class PlayerView {
     hand: json['hand'] != null
         ? tilesFromJson(json['hand'] as List<dynamic>)
         : null,
+    connected: json['connected'] as bool? ?? true,
   );
 }
 
@@ -161,10 +175,15 @@ class GameStateSnapshot {
   /// Aktion, die zu diesem Zustand geführt hat (vom Aufrufer - der die
   /// gerade verarbeitete Nachricht kennt - explizit übergeben, da
   /// [QwirkleGame] selbst keine "letzter Zug"-Historie führt).
+  /// [disconnectedPlayerIndexes] markiert Sitzplätze, deren Netzwerk-Client
+  /// aktuell getrennt ist (siehe `RoomSeat.connected`/
+  /// `HostSession._disconnectedPlayerIndexes`) - leer für Bots und Partien
+  /// ohne Trennungs-Tracking.
   factory GameStateSnapshot.forRecipient(
     QwirkleGame game,
     int recipientPlayerIndex, {
     LastMoveInfo? lastMove,
+    Set<int> disconnectedPlayerIndexes = const {},
   }) {
     return GameStateSnapshot(
       players: [
@@ -172,6 +191,7 @@ class GameStateSnapshot {
           PlayerView.of(
             game.players[i],
             includeHand: i == recipientPlayerIndex,
+            connected: !disconnectedPlayerIndexes.contains(i),
           ),
       ],
       currentPlayerIndex: game.currentPlayerIndex,

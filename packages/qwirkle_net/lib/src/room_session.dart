@@ -54,6 +54,13 @@ class RoomSeat {
 /// Partie ist, die sich über mehrere Tage ziehen kann.
 class RoomSession {
   final String roomCode;
+
+  /// Frei vergebener Name des Raums (z. B. "Samstagsrunde") - damit sich
+  /// der Raum in der lokalen Historie wiederfinden lässt, statt nur über
+  /// den kaum merkbaren Code (siehe `internet_room_history.dart`,
+  /// Nutzer-Feedback "Räume sollten auch Namen bekommen"). Fällt auf
+  /// "Raum $roomCode" zurück, falls beim Erstellen keiner angegeben wurde.
+  final String roomName;
   final List<RoomSeat> seats = [];
   QwirkleGame? _game;
   DateTime lastActivity = DateTime.now();
@@ -83,10 +90,14 @@ class RoomSession {
   /// beitretende Spieler:innen eine bereits vergebene Id bekommen.
   RoomSession({
     required this.roomCode,
+    String? roomName,
     this.onChanged,
     QwirkleGame? initialGame,
     int nextPlayerNumber = 1,
-  }) : _game = initialGame,
+  }) : roomName = (roomName == null || roomName.trim().isEmpty)
+           ? 'Raum $roomCode'
+           : roomName.trim(),
+       _game = initialGame,
        _nextPlayerNumber = nextPlayerNumber;
 
   bool get isGameStarted => _game != null;
@@ -96,6 +107,16 @@ class RoomSession {
   List<({String id, String name})> get lobbyPlayers => [
     for (final s in seats) (id: s.playerId, name: s.name),
   ];
+
+  /// Sitzplätze, deren Netzwerk-Client aktuell getrennt ist (Index-basiert,
+  /// für [GameStateSnapshot.forRecipient]) - für die UI, damit sichtbar
+  /// wird, wenn jemand die Verbindung verloren hat, statt dass die Partie
+  /// (siehe Klassendoku: bewusst kein Auto-Skip) kommentarlos zu warten
+  /// scheint.
+  Set<int> get _disconnectedPlayerIndexes => {
+    for (final s in seats)
+      if (!s.connected && s.playerIndex != null) s.playerIndex!,
+  };
 
   String _generateToken() {
     final bytes = List<int>.generate(24, (_) => _random.nextInt(256));
@@ -150,20 +171,18 @@ class RoomSession {
         roomCode: roomCode,
         reconnectToken: seat.reconnectToken,
         isOwner: seat.isOwner,
+        roomName: roomName,
       ),
     );
 
-    final game = _game;
-    if (game != null && seat.playerIndex != null) {
-      seat.send(
-        GameStateMessage(
-          GameStateSnapshot.forRecipient(
-            game,
-            seat.playerIndex!,
-            lastMove: _lastMove,
-          ),
-        ),
-      );
+    if (_game != null && seat.playerIndex != null) {
+      // Ein neu (wieder-)verbundener Sitzplatz mit bereits zugewiesenem
+      // Index kann nur ein Reconnect sein (ein frischer Sitzplatz bekommt
+      // seinen Index erst bei Spielstart) - betrifft daher alle, nicht nur
+      // diesen Sitzplatz: sonst sehen die anderen nie, dass diese Person
+      // wieder verbunden ist, was gerade dann wichtig ist, wenn sie selbst
+      // am Zug ist.
+      _broadcastState();
     } else {
       _broadcastLobby();
     }
@@ -248,7 +267,9 @@ class RoomSession {
     if (seats.length < 2) {
       throw StateError('Es werden mindestens 2 Spieler:innen benötigt.');
     }
-    final players = [for (final s in seats) Player(id: s.playerId, name: s.name)];
+    final players = [
+      for (final s in seats) Player(id: s.playerId, name: s.name),
+    ];
     final game = QwirkleGame(players: players);
     _game = game;
     _lastMove = null;
@@ -263,7 +284,9 @@ class RoomSession {
       _startGame();
       return;
     }
-    final players = [for (final s in seats) Player(id: s.playerId, name: s.name)];
+    final players = [
+      for (final s in seats) Player(id: s.playerId, name: s.name),
+    ];
     _game = QwirkleGame(players: players);
     _lastMove = null;
     for (var i = 0; i < seats.length; i++) {
@@ -282,12 +305,18 @@ class RoomSession {
   void _broadcastState() {
     final game = _game;
     if (game == null) return;
+    final disconnected = _disconnectedPlayerIndexes;
     for (final s in seats) {
       final index = s.playerIndex;
       if (index == null) continue;
       s.send(
         GameStateMessage(
-          GameStateSnapshot.forRecipient(game, index, lastMove: _lastMove),
+          GameStateSnapshot.forRecipient(
+            game,
+            index,
+            lastMove: _lastMove,
+            disconnectedPlayerIndexes: disconnected,
+          ),
         ),
       );
     }
@@ -310,6 +339,12 @@ class RoomSession {
       // Bewusst KEIN automatisches Überspringen des Zugs (Unterschied zu
       // HostSession): Die Partie wartet, bis der Sitzplatz per
       // Reconnect-Token zurückerobert wird.
+      //
+      // Ohne diesen Broadcast erfahren die anderen Sitzplätze nie von der
+      // Trennung (vorher wurde hier nur die lokale Flagge gesetzt) - gerade
+      // wenn diese Person am Zug ist, sähe die Partie sonst kommentarlos
+      // aus wie "hängengeblieben", ohne erkennbaren Grund.
+      _broadcastState();
     }
     onChanged?.call();
   }

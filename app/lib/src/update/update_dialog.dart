@@ -43,22 +43,28 @@ class UpdateDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(updateControllerProvider);
     final controller = ref.read(updateControllerProvider.notifier);
+    final platform = ref.watch(targetPlatformProvider);
 
     return AlertDialog(
-      title: Text(_titleFor(state.phase)),
-      content: _ContentFor(state: state),
-      actions: _actionsFor(context, controller, state),
+      title: Text(_titleFor(state.phase, platform)),
+      content: _ContentFor(state: state, platform: platform),
+      actions: _actionsFor(context, controller, state, platform),
     );
   }
 
-  String _titleFor(UpdatePhase phase) {
+  String _titleFor(UpdatePhase phase, UpdateTargetPlatform platform) {
     switch (phase) {
       case UpdatePhase.available:
         return 'Update verfügbar';
       case UpdatePhase.downloading:
         return 'Wird heruntergeladen…';
       case UpdatePhase.readyToRelaunch:
-        return 'Bereit zum Neustart';
+        // Android installiert ein Update über einen System-Dialog statt
+        // über einen Prozess-Neustart wie bei Desktop - "Neustart" würde
+        // hier in die Irre führen.
+        return platform == UpdateTargetPlatform.android
+            ? 'Bereit zur Installation'
+            : 'Bereit zum Neustart';
       case UpdatePhase.applying:
         return 'Wird angewendet…';
       case UpdatePhase.error:
@@ -74,6 +80,7 @@ class UpdateDialog extends ConsumerWidget {
     BuildContext context,
     UpdateController controller,
     UpdateState state,
+    UpdateTargetPlatform platform,
   ) {
     switch (state.phase) {
       case UpdatePhase.available:
@@ -97,8 +104,21 @@ class UpdateDialog extends ConsumerWidget {
             child: const Text('Später'),
           ),
           FilledButton(
-            onPressed: () => controller.confirmApply(),
-            child: const Text('Jetzt neu starten'),
+            onPressed: () async {
+              await controller.confirmApply();
+              // Auf Desktop wird dieser Punkt nie erreicht - confirmApply()
+              // beendet den Prozess dort vorher (exit(0)). Auf Android
+              // kehrt confirmApply() dagegen normal zurück, sobald der
+              // Install-Intent gestartet wurde (die eigentliche Bestätigung
+              // läuft im System-Dialog, außerhalb dieser App) - ohne den
+              // Pop hier bliebe der Dialog danach einfach offen hängen.
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            child: Text(
+              platform == UpdateTargetPlatform.android
+                  ? 'Jetzt installieren'
+                  : 'Jetzt neu starten',
+            ),
           ),
         ];
       case UpdatePhase.error:
@@ -122,9 +142,10 @@ class UpdateDialog extends ConsumerWidget {
 }
 
 class _ContentFor extends StatelessWidget {
-  const _ContentFor({required this.state});
+  const _ContentFor({required this.state, required this.platform});
 
   final UpdateState state;
+  final UpdateTargetPlatform platform;
 
   @override
   Widget build(BuildContext context) {
@@ -163,8 +184,13 @@ class _ContentFor extends StatelessWidget {
           ],
         );
       case UpdatePhase.readyToRelaunch:
-        return const Text(
-          'Das Update wurde heruntergeladen und geprüft. Beim Neustart wird die neue Version verwendet.',
+        return Text(
+          platform == UpdateTargetPlatform.android
+              ? 'Das Update wurde heruntergeladen und geprüft. Bestätige '
+                    'die Installation im folgenden Systemdialog. Falls '
+                    'Android nach der Erlaubnis fragt, Apps aus dieser '
+                    'Quelle zu installieren, einmalig zustimmen.'
+              : 'Das Update wurde heruntergeladen und geprüft. Beim Neustart wird die neue Version verwendet.',
         );
       case UpdatePhase.applying:
         return const SizedBox(

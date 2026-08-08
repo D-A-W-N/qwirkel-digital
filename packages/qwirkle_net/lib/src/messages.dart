@@ -30,7 +30,14 @@ class JoinMessage extends NetMessage {
   final String? roomCode;
   final String? reconnectToken;
 
-  JoinMessage(this.name, {this.roomCode, this.reconnectToken});
+  /// Nur relevant, wenn [roomCode] `null` ist (ein neuer Raum entsteht) -
+  /// der von der Person beim Hosten frei vergebene Name, damit sich der
+  /// Raum später in der lokalen Historie wiederfinden lässt statt nur über
+  /// den kaum merkbaren Code. `null`/leer lässt den Server einen Fallback-
+  /// Namen vergeben (siehe `RoomSession.roomName`).
+  final String? roomName;
+
+  JoinMessage(this.name, {this.roomCode, this.reconnectToken, this.roomName});
 
   @override
   String get type => 'join';
@@ -40,12 +47,14 @@ class JoinMessage extends NetMessage {
     'name': name,
     if (roomCode != null) 'roomCode': roomCode,
     if (reconnectToken != null) 'reconnectToken': reconnectToken,
+    if (roomName != null) 'roomName': roomName,
   };
 
   factory JoinMessage.fromJson(Map<String, dynamic> json) => JoinMessage(
     json['name'] as String,
     roomCode: json['roomCode'] as String?,
     reconnectToken: json['reconnectToken'] as String?,
+    roomName: json['roomName'] as String?,
   );
 }
 
@@ -65,11 +74,17 @@ class WelcomeMessage extends NetMessage {
   /// reconnectender Owner seine Rolle zuverlässig zurückbekommt.
   final bool isOwner;
 
+  /// Nur `qwirkle_server`-Backend: der (vom Ersteller vergebene oder vom
+  /// Server generierte Fallback-) Name des Raums - jede beitretende Person
+  /// bekommt ihn hier mitgeteilt, nicht nur die, die den Raum erstellt hat.
+  final String? roomName;
+
   WelcomeMessage(
     this.playerId, {
     this.roomCode,
     this.reconnectToken,
     this.isOwner = false,
+    this.roomName,
   });
 
   @override
@@ -81,15 +96,16 @@ class WelcomeMessage extends NetMessage {
     if (roomCode != null) 'roomCode': roomCode,
     if (reconnectToken != null) 'reconnectToken': reconnectToken,
     if (isOwner) 'isOwner': isOwner,
+    if (roomName != null) 'roomName': roomName,
   };
 
-  factory WelcomeMessage.fromJson(Map<String, dynamic> json) =>
-      WelcomeMessage(
-        json['playerId'] as String,
-        roomCode: json['roomCode'] as String?,
-        reconnectToken: json['reconnectToken'] as String?,
-        isOwner: json['isOwner'] as bool? ?? false,
-      );
+  factory WelcomeMessage.fromJson(Map<String, dynamic> json) => WelcomeMessage(
+    json['playerId'] as String,
+    roomCode: json['roomCode'] as String?,
+    reconnectToken: json['reconnectToken'] as String?,
+    isOwner: json['isOwner'] as bool? ?? false,
+    roomName: json['roomName'] as String?,
+  );
 }
 
 /// Raumbesitzer:in -> Server: startet die Partie mit allen aktuell im Raum

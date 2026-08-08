@@ -20,6 +20,12 @@ abstract class UpdateApplier {
 
   /// Swaps the prepared update into place and relaunches the app. On
   /// success this does not return — the process exits.
+  ///
+  /// Exception: on Android there is no in-place swap/relaunch (a running
+  /// app can't replace its own installed package) - `confirmApply()` there
+  /// hands the downloaded APK to the system package installer and returns
+  /// normally once that intent has been started, well before the person
+  /// has actually confirmed (or even seen) the install dialog.
   Future<void> confirmApply();
 
   /// Removes a stale `.bak` sibling left over from a previous update, if

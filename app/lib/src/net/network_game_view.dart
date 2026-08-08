@@ -5,8 +5,10 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../game/widgets/board_surface.dart';
+import '../game/widgets/compact_button_style.dart';
 import '../game/widgets/game_bottom_bar.dart';
 import '../game/widgets/hand_view.dart';
+import '../game/widgets/pending_score_badge.dart';
 import '../game/widgets/score_panel.dart';
 import '../game/widgets/turn_dialog.dart';
 
@@ -93,6 +95,35 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   bool _exchangeMode = false;
   final Set<int> _selectedForExchange = {};
 
+  /// Eigener Messenger statt `ScaffoldMessenger.of(context)`: `context`
+  /// dieses States liegt OBERHALB des eigenen `Scaffold`s (das erst in
+  /// `build()` entsteht), sodass `.of(context)` aus `didUpdateWidget`
+  /// heraus nicht zuverlässig den hiesigen Messenger fände.
+  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  /// Letzte bereits als Toast gezeigte Zug-Zusammenfassung (Signatur statt
+  /// Objekt, da `LastMoveInfo` kein `==` implementiert) - verhindert, dass
+  /// ein unabhängiger Rebuild (z. B. eigene Platzierung) denselben fremden
+  /// Zug erneut als Toast auslöst.
+  String? _lastToastedMoveSignature;
+
+  String? _moveSignature(LastMoveInfo? move) {
+    if (move == null) return null;
+    return '${move.playerIndex}-${move.kind}-${move.score}-${move.placements.length}';
+  }
+
+  void _showToast(String message, {Color? color}) {
+    _scaffoldMessengerKey.currentState
+      ?..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: color,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -101,6 +132,18 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         setState(() => _showStartPulse = false);
       }
     });
+    // `didUpdateWidget` erkennt nur ÄNDERUNGEN, feuert also nicht für den
+    // bereits beim allerersten Aufbau gesetzten Statustext (z. B. "Spiel
+    // gestartet", von `network_game_screen.dart` oft schon vor dem ersten
+    // Frame gesetzt) - ohne diesen Extra-Toast würde diese erste Meldung
+    // sonst nie angezeigt.
+    final initialStatusText = widget.statusText;
+    if (initialStatusText != null && initialStatusText.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showToast(initialStatusText);
+      });
+    }
   }
 
   @override
@@ -120,7 +163,8 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // gerade gelegten Steine sonst kommentarlos verschwunden aus, ohne
     // dass klar wird, warum.
     final turnAdvancedAwayFromMe =
-        widget.snapshot.currentPlayerIndex != oldWidget.snapshot.currentPlayerIndex &&
+        widget.snapshot.currentPlayerIndex !=
+            oldWidget.snapshot.currentPlayerIndex &&
         widget.snapshot.currentPlayerIndex != widget.snapshot.yourPlayerIndex;
     // Regression: eine neu gestartete Partie (Übergang isOver -> nicht mehr
     // isOver) bringt ein komplett frisches Brett/Hand vom Server, aber ohne
@@ -149,11 +193,61 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // Zug bin - Nutzer-Feedback: nicht immer sofort ersichtlich, wer dran ist.
     final becameMyTurn =
         widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex &&
-        oldWidget.snapshot.currentPlayerIndex != widget.snapshot.currentPlayerIndex;
-    if (becameMyTurn) {
+        oldWidget.snapshot.currentPlayerIndex !=
+            widget.snapshot.currentPlayerIndex;
+    // Andersrum gilt dasselbe für eine zurückkehrende Person: die Partie
+    // überspringt ihren Zug bei einer Trennung bewusst NICHT (siehe
+    // RoomSession-Doku), es kann also schon vor dem Reconnect ihr Zug
+    // gewesen sein und bleibt es danach unverändert - `currentPlayerIndex`
+    // ändert sich dann gar nicht, `becameMyTurn` bliebe fälschlich `false`.
+    // Erkennbar stattdessen am Wechsel von `canInteract: false -> true`
+    // OHNE eigentlichen Zugwechsel (reines Reconnect-Signal - ein normaler
+    // Zugwechsel triggert bereits über `becameMyTurn` oben und würde sonst
+    // doppelt anzeigen). Nutzer-Feedback: "andersrum sollte der Spieler,
+    // der am Zug ist, auch drauf hingewiesen werden".
+    final regainedTurnAfterReconnect =
+        !becameMyTurn &&
+        widget.canInteract &&
+        !oldWidget.canInteract &&
+        widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex;
+    if (becameMyTurn || regainedTurnAfterReconnect) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showTurnDialog(context, message: 'Du bist jetzt am Zug.');
+      });
+    }
+
+    // Der fremde-Zug-Hinweis war vorher ein dauerhaft stehendes Banner ohne
+    // jedes Selbst-Ausblenden - Nutzer-Feedback: "Benachrichtigungen
+    // verschwinden nicht während des Spiels". Ein Toast (SnackBar) bringt
+    // das automatische Verschwinden eingebaut mit.
+    final lastMove = widget.snapshot.lastMove;
+    final lastMoveByOther =
+        lastMove != null &&
+            lastMove.playerIndex != widget.snapshot.yourPlayerIndex
+        ? lastMove
+        : null;
+    final moveSignature = _moveSignature(lastMoveByOther);
+    if (moveSignature != null && moveSignature != _lastToastedMoveSignature) {
+      _lastToastedMoveSignature = moveSignature;
+      final playerName =
+          widget.snapshot.players[lastMoveByOther!.playerIndex].name;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showToast(_describeLastMove(lastMoveByOther, playerName));
+      });
+    }
+
+    // Server-/Host-seitige Statushinweise (z. B. Verbindungsstatus) waren
+    // vorher als dauerhafte Box im unteren Panel eingebettet - wandern jetzt
+    // ebenfalls als Toast, statt permanent Platz zu belegen.
+    if (widget.statusText != null &&
+        widget.statusText!.isNotEmpty &&
+        widget.statusText != oldWidget.statusText) {
+      final message = widget.statusText!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showToast(message);
       });
     }
   }
@@ -279,20 +373,28 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       return 'Die Partie ist beendet. Die Punkte werden nun ausgewertet.';
     }
     if (_pendingPlacements.isNotEmpty) {
-      final score = _pendingScore(board);
-      // Zwei getrennte Zahlen, damit der Punktwert dieses einen Zugs nicht
-      // mit dem laufenden Gesamtstand der Partie verwechselt wird - siehe
-      // dieselbe Unterscheidung im lokalen Spiel (`GameController`).
-      final scoreSuffix = score != null
-          ? '\nDieser Zug: $score Punkt${score == 1 ? '' : 'e'} '
-                '· Gesamt danach: ${widget.snapshot.players[widget.snapshot.yourPlayerIndex].score + score}'
-          : '';
-      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.$scoreSuffix';
+      // Der Punktwert dieses Zugs steht jetzt als eigenes Badge oben rechts
+      // über dem Brett (siehe [PendingScoreBadge]), statt hier als zweite
+      // Zeile die Statuszeile aufzublähen - Nutzer-Feedback: das untere
+      // Menü ist auf dem Handy beim eigenen Zug viel zu groß.
+      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.';
     }
     // Nennt den Namen, statt nur generisch "auf den nächsten Zug" zu warten -
     // übernimmt damit die einzige Information, die vorher exklusiv in der
     // jetzt entfernten separaten "Aktueller Zug: X"-Zeile stand.
-    if (!isMyTurn) return 'Warte auf $currentPlayerName.';
+    if (!isMyTurn) {
+      // Die Partie überspringt eine getrennte Person nicht automatisch
+      // (siehe RoomSession-Doku) - ohne diesen Hinweis sähe das Warten
+      // kommentarlos wie ein hängendes Spiel aus, statt erkennbar auf eine
+      // Reconnect zu warten. Nutzer-Feedback: Benachrichtigung, wenn die
+      // Person, die am Zug ist, nicht (mehr) im Spiel ist.
+      final currentPlayerConnected =
+          widget.snapshot.players[widget.snapshot.currentPlayerIndex].connected;
+      if (!currentPlayerConnected) {
+        return '$currentPlayerName ist nicht verbunden – die Partie wartet auf eine Rückkehr.';
+      }
+      return 'Warte auf $currentPlayerName.';
+    }
     return 'Du bist am Zug. Ziehe einen Stein auf das Brett.';
   }
 
@@ -303,7 +405,9 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   /// letzten Stein gelegt hat, danach fälschlich weiter bedienbar blieben.
   Widget _buildGameOverOverlay() {
     final players = widget.snapshot.players;
-    final highestScore = players.map((p) => p.score).reduce((a, b) => a > b ? a : b);
+    final highestScore = players
+        .map((p) => p.score)
+        .reduce((a, b) => a > b ? a : b);
     final winners = players.where((p) => p.score == highestScore).toList();
 
     return Positioned.fill(
@@ -351,7 +455,9 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                               Text(player.name),
                               Text(
                                 '${player.score} ${player.score == 1 ? 'Punkt' : 'Punkte'}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -389,7 +495,10 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   /// (`game_screen.dart`).
   Widget _buildActionButtons(bool isMyTurn) {
     final canAct = widget.canInteract && isMyTurn && !_isSending;
-    final canPass = canAct && widget.snapshot.bagRemaining == 0 && _pendingPlacements.isEmpty;
+    final canPass =
+        canAct &&
+        widget.snapshot.bagRemaining == 0 &&
+        _pendingPlacements.isEmpty;
 
     return Wrap(
       spacing: 8,
@@ -397,6 +506,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       children: [
         if (!_exchangeMode) ...[
           FilledButton(
+            style: compactButtonStyle,
             onPressed: canAct && _pendingPlacements.isNotEmpty
                 ? () async {
                     setState(() => _isSending = true);
@@ -419,7 +529,11 @@ class _NetworkGameViewState extends State<NetworkGameView> {
             child: const Text('Zug senden'),
           ),
           OutlinedButton(
-            onPressed: widget.canInteract && _pendingPlacements.isNotEmpty && !_isSending
+            style: compactButtonStyle,
+            onPressed:
+                widget.canInteract &&
+                    _pendingPlacements.isNotEmpty &&
+                    !_isSending
                 ? () => setState(() {
                     _pendingPlacements.clear();
                     _handIndexByPosition.clear();
@@ -430,10 +544,12 @@ class _NetworkGameViewState extends State<NetworkGameView> {
           ),
         ] else
           FilledButton(
+            style: compactButtonStyle,
             onPressed: canAct && _selectedForExchange.isNotEmpty
                 ? () {
                     final tiles = [
-                      for (final index in _selectedForExchange) widget.ownHand[index],
+                      for (final index in _selectedForExchange)
+                        widget.ownHand[index],
                     ];
                     widget.onSendExchange(tiles);
                     setState(() {
@@ -445,6 +561,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
             child: const Text('Steine tauschen'),
           ),
         TextButton(
+          style: compactButtonStyle,
           onPressed: canAct
               ? () => setState(() {
                   _exchangeMode = !_exchangeMode;
@@ -455,6 +572,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         ),
         if (canPass)
           OutlinedButton(
+            style: compactButtonStyle,
             onPressed: widget.onSendPass,
             child: const Text('Aussetzen'),
           ),
@@ -464,19 +582,16 @@ class _NetworkGameViewState extends State<NetworkGameView> {
 
   @override
   Widget build(BuildContext context) {
-    final isMyTurn = widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex;
+    final isMyTurn =
+        widget.snapshot.currentPlayerIndex == widget.snapshot.yourPlayerIndex;
     final players = widget.snapshot.players
         .map(
-          (player) => Player(
-            id: player.id,
-            name: player.name,
-            botDifficulty: null,
-          ),
+          (player) =>
+              Player(id: player.id, name: player.name, botDifficulty: null),
         )
         .toList();
 
     final currentPlayer = players[widget.snapshot.currentPlayerIndex];
-    final myPlayer = players[widget.snapshot.yourPlayerIndex];
     final board = <Position, Tile>{
       for (final placement in widget.snapshot.board)
         placement.position: placement.tile,
@@ -486,15 +601,15 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // schon, da man sie selbst gerade platziert hat.
     final lastMove = widget.snapshot.lastMove;
     final lastMoveByOther =
-        lastMove != null && lastMove.playerIndex != widget.snapshot.yourPlayerIndex
+        lastMove != null &&
+            lastMove.playerIndex != widget.snapshot.yourPlayerIndex
         ? lastMove
         : null;
     final lastMovePositions = lastMoveByOther?.kind == LastMoveKind.placed
         ? {for (final p in lastMoveByOther!.placements) p.position}
         : const <Position>{};
-    final lastMoveSummary = lastMoveByOther == null
-        ? null
-        : _describeLastMove(lastMoveByOther, players[lastMoveByOther.playerIndex].name);
+
+    final pendingScore = _pendingScore(board);
 
     // Hand-"Slots": bereits vorläufig platzierte Steine erscheinen als
     // Lücke statt doppelt (in der Hand UND auf dem Brett) - siehe
@@ -504,248 +619,209 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       if (index < handSlots.length) handSlots[index] = null;
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Qwirkle · ${widget.snapshot.bagRemaining} übrig'),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            ScorePanel(
-              players: players,
-              currentIndex: widget.snapshot.currentPlayerIndex,
-              scores: [for (final p in widget.snapshot.players) p.score],
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  BoardSurface(
-                    board: board,
-                    pendingPlacements: _pendingPlacements,
-                    canInteract: widget.canInteract,
-                    onDropTile: (handIndex, position) =>
-                        _stageTile(board, handIndex, position),
-                    onUnstage: _unstageTile,
-                    cellSize: _cellSize,
-                    tileSize: _tileSize,
-                    highlightedPositions: lastMovePositions,
-                  ),
-                  if (_showStartPulse && !widget.snapshot.isOver)
-                    Positioned.fill(
-                      child: Center(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 600),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            'Neue Partie gestartet',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.onPrimary,
-                                ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if ((_liveError ?? widget.errorText) != null ||
-                      lastMoveSummary != null ||
-                      _showTutorial)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      right: 12,
-                      child: Column(
-                        children: [
-                          if ((_liveError ?? widget.errorText) != null) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.errorContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.error_outline,
-                                    size: 18,
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      (_liveError ?? widget.errorText)!,
-                                      style: Theme.of(context).textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onErrorContainer,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          if (lastMoveSummary != null) ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.history, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      lastMoveSummary,
-                                      style: Theme.of(context).textTheme.bodyMedium,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          if (_showTutorial)
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surface.withValues(alpha: 0.95),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'So spielst du',
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleMedium,
-                                        ),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            setState(() => _showTutorial = false),
-                                        child: const Text('Los geht’s'),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Text(
-                                    'Ziehe einen Stein aus deiner Hand auf das Brett und sende deinen Zug. Ziel ist es, Farben oder Formen in Reihen zu bilden.',
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  if (widget.snapshot.isOver) _buildGameOverOverlay(),
+    return ScaffoldMessenger(
+      key: _scaffoldMessengerKey,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Qwirkle · ${widget.snapshot.bagRemaining} übrig'),
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              ScorePanel(
+                players: players,
+                currentIndex: widget.snapshot.currentPlayerIndex,
+                scores: [for (final p in widget.snapshot.players) p.score],
+                connected: [
+                  for (final p in widget.snapshot.players) p.connected,
                 ],
               ),
-            ),
-            // Am Partie-Ende deckt das Ergebnis-Overlay
-            // (`_buildGameOverOverlay`) bereits alles Nötige ab (inkl.
-            // Neustart-Button), die Leiste entfällt dann.
-            if (!widget.snapshot.isOver)
-              GameBottomBar(
-                statusIcon: _statusIcon(isMyTurn),
-                statusText: _statusText(board, isMyTurn, currentPlayer.name),
-                statusColor: _statusColor(context, isMyTurn),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+              Expanded(
+                child: Stack(
                   children: [
-                    if (widget.statusText != null &&
-                        widget.statusText!.isNotEmpty) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
+                    BoardSurface(
+                      board: board,
+                      pendingPlacements: _pendingPlacements,
+                      canInteract: widget.canInteract,
+                      onDropTile: (handIndex, position) =>
+                          _stageTile(board, handIndex, position),
+                      onUnstage: _unstageTile,
+                      cellSize: _cellSize,
+                      tileSize: _tileSize,
+                      highlightedPositions: lastMovePositions,
+                    ),
+                    if (pendingScore != null)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: PendingScoreBadge(
+                          score: pendingScore,
+                          totalAfter:
+                              widget
+                                  .snapshot
+                                  .players[widget.snapshot.yourPlayerIndex]
+                                  .score +
+                              pendingScore,
                         ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                widget.statusText!,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
+                      ),
+                    if (_showStartPulse && !widget.snapshot.isOver)
+                      Positioned.fill(
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 600),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
                             ),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              'Neue Partie gestartet',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if ((_liveError ?? widget.errorText) != null ||
+                        _showTutorial)
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        right: 12,
+                        child: Column(
+                          children: [
+                            if ((_liveError ?? widget.errorText) != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      size: 18,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        (_liveError ?? widget.errorText)!,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onErrorContainer,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (_showTutorial)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surface.withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            'So spielst du',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleMedium,
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => setState(
+                                            () => _showTutorial = false,
+                                          ),
+                                          child: const Text('Los geht’s'),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'Ziehe einen Stein aus deiner Hand auf das Brett und sende deinen Zug. Ziel ist es, Farben oder Formen in Reihen zu bilden.',
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    Text(
-                      'Du spielst als ${myPlayer.name}',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    HandRow(
-                      slots: handSlots,
-                      canInteract: widget.canInteract,
-                      exchangeMode: _exchangeMode,
-                      selectedForExchange: _selectedForExchange,
-                      onToggleExchange: _toggleExchangeSelection,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Deine Hand: ${widget.snapshot.players[widget.snapshot.yourPlayerIndex].handCount} Steine',
-                    ),
-                    const SizedBox(height: 8),
-                    _buildActionButtons(isMyTurn),
+                    if (widget.snapshot.isOver) _buildGameOverOverlay(),
                   ],
                 ),
               ),
-          ],
+              // Am Partie-Ende deckt das Ergebnis-Overlay
+              // (`_buildGameOverOverlay`) bereits alles Nötige ab (inkl.
+              // Neustart-Button), die Leiste entfällt dann.
+              if (!widget.snapshot.isOver)
+                GameBottomBar(
+                  statusIcon: _statusIcon(isMyTurn),
+                  statusText: _statusText(board, isMyTurn, currentPlayer.name),
+                  statusColor: _statusColor(context, isMyTurn),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      HandRow(
+                        slots: handSlots,
+                        canInteract: widget.canInteract,
+                        exchangeMode: _exchangeMode,
+                        selectedForExchange: _selectedForExchange,
+                        onToggleExchange: _toggleExchangeSelection,
+                      ),
+                      const SizedBox(height: 6),
+                      _buildActionButtons(isMyTurn),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

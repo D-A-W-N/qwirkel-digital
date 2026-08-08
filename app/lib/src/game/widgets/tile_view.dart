@@ -44,8 +44,22 @@ class TileView extends StatelessWidget {
         color: const Color(0xFF222222),
         borderRadius: BorderRadius.circular(size * 0.15),
         border: highlighted
-            ? Border.all(color: highlightColor, width: 2)
+            ? Border.all(color: highlightColor, width: 3)
             : Border.all(color: Colors.black54, width: 1),
+        // Ein zusätzlicher Glow macht die Hervorhebung auch bei kleiner
+        // Kachelgröße/auf dem Handy klar erkennbar, statt sich nur auf die
+        // (dort kaum wahrnehmbare) Randfarbe zu verlassen - Nutzer-Feedback:
+        // die Farbe für gegnerische Züge muss "markanter und auffälliger"
+        // sein.
+        boxShadow: highlighted
+            ? [
+                BoxShadow(
+                  color: highlightColor.withValues(alpha: 0.75),
+                  blurRadius: 10,
+                  spreadRadius: 1.5,
+                ),
+              ]
+            : null,
       ),
       padding: EdgeInsets.all(size * 0.16),
       child: CustomPaint(

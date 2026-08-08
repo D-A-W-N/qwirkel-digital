@@ -11,6 +11,7 @@ import 'serialization.dart';
 /// frei von Persistenz-/Netzwerk-Belangen.
 Map<String, dynamic> roomSessionToJson(RoomSession room) => {
   'roomCode': room.roomCode,
+  'roomName': room.roomName,
   'lastActivity': room.lastActivity.toIso8601String(),
   'seats': [for (final seat in room.seats) _seatToJson(seat)],
   if (room.game != null) 'game': _gameToJson(room.game!),
@@ -73,6 +74,10 @@ RoomSession roomSessionFromJson(
 
   final room = RoomSession(
     roomCode: json['roomCode'] as String,
+    // Ältere, vor diesem Feature persistierte Räume kennen `roomName`
+    // noch nicht - `RoomSession`s Konstruktor fällt dann automatisch auf
+    // "Raum $roomCode" zurück.
+    roomName: json['roomName'] as String?,
     onChanged: onChanged,
     initialGame: game,
     nextPlayerNumber: nextPlayerNumber,

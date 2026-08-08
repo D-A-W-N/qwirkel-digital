@@ -12,11 +12,19 @@ class ScorePanel extends StatelessWidget {
   /// direkt (Standard, wenn [scores] weggelassen wird).
   final List<int>? scores;
 
+  /// Verbindungsstatus pro Spieler:in (siehe `PlayerView.connected`) - nur
+  /// für Netzwerkpartien relevant, `null` (Standard) blendet das Symbol
+  /// komplett aus, damit das lokale Spiel unverändert bleibt. Nutzer-
+  /// Feedback: es sollte sichtbar sein, wenn jemand nicht (mehr) im Raum
+  /// ist, statt dass die Partie kommentarlos zu warten scheint.
+  final List<bool>? connected;
+
   const ScorePanel({
     super.key,
     required this.players,
     required this.currentIndex,
     this.scores,
+    this.connected,
   });
 
   @override
@@ -32,9 +40,25 @@ class ScorePanel extends StatelessWidget {
           final active = index == currentIndex;
           final player = players[index];
           final score = scores != null ? scores![index] : player.score;
+          final isDisconnected = connected != null && !connected![index];
           return Chip(
             avatar: active ? const Icon(Icons.play_arrow, size: 18) : null,
-            label: Text('${player.name}: $score ${score == 1 ? 'Punkt' : 'Punkte'}'),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isDisconnected) ...[
+                  Icon(
+                    Icons.wifi_off,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  '${player.name}: $score ${score == 1 ? 'Punkt' : 'Punkte'}',
+                ),
+              ],
+            ),
             backgroundColor: active
                 ? Theme.of(context).colorScheme.tertiaryContainer
                 : null,
