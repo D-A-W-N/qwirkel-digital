@@ -70,3 +70,12 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Für androidx.core.content.FileProvider in MainActivity.kt (In-App-
+    // Updater übergibt die heruntergeladene APK darüber an den System-
+    // Paketinstaller). Wahrscheinlich ohnehin schon transitiv über das
+    // Flutter-Embedding vorhanden, aber explizit deklariert, um nicht
+    // stillschweigend davon abhängig zu sein.
+    implementation("androidx.core:core-ktx:1.13.1")
+}

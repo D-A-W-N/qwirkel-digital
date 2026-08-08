@@ -61,6 +61,21 @@ void main() {
       expect(selected.checksumAsset.name, 'qwirkle-digital-windows.zip.sha256');
     });
 
+    test('picks the Android asset and its checksum sidecar', () {
+      final release = _releaseWithAssets([
+        'qwirkle-digital-android.apk',
+        'qwirkle-digital-android.apk.sha256',
+        'qwirkle-digital-linux.tar.gz',
+        'qwirkle-digital-linux.tar.gz.sha256',
+      ]);
+
+      final selected = selectAssetForPlatform(release, UpdateTargetPlatform.android);
+
+      expect(selected, isNotNull);
+      expect(selected!.asset.name, 'qwirkle-digital-android.apk');
+      expect(selected.checksumAsset.name, 'qwirkle-digital-android.apk.sha256');
+    });
+
     test('returns null for an unsupported platform', () {
       final release = _releaseWithAssets([
         'qwirkle-digital-macos.zip',

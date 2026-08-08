@@ -3,6 +3,13 @@
          Verbindungen (Host/Client-Sockets, qwirkle_server) - ohne diese
          Berechtigung scheitert jeder Verbindungsversuch sofort. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Für den In-App-Updater: erlaubt der App, eine selbst heruntergeladene
+         APK dem System-Paketinstaller zu übergeben (siehe MainActivity.kt).
+         Android fragt beim allerersten Versuch trotzdem einmalig im
+         Installer-Dialog nach, ob Installationen aus dieser Quelle erlaubt
+         werden sollen (pro-App-Umschalter seit Android 8) - das lässt sich
+         von der App aus nicht überspringen. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:label="Qwirkle"
         android:name="${applicationName}"
@@ -34,6 +41,20 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Stellt die vom In-App-Updater heruntergeladene APK (im
+             App-eigenen Cache-Verzeichnis) als content://-URI für den
+             System-Paketinstaller bereit - ein file://-URI wäre für andere
+             Apps nicht zugänglich. Siehe MainActivity.kt und
+             res/xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

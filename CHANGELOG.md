@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Android now supports in-app updates: the app checks GitHub Releases, downloads and verifies the new APK, then hands it to the system package installer for confirmation (a running app can't silently replace its own installed package on Android, unlike the desktop builds - installation still requires a final tap in the system dialog)
+
 ## [0.9.18] - 2026-08-07
 
 - Added Android as a supported platform: signed release APKs are now built and published to GitHub Releases alongside the desktop builds. Sideload only for now (no Play Store listing), and the in-app updater doesn't cover Android yet - re-download the APK manually for new versions
