@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+## [0.9.19] - 2026-08-08
+
 - Android now supports in-app updates: the app checks GitHub Releases, downloads and verifies the new APK, then hands it to the system package installer for confirmation (a running app can't silently replace its own installed package on Android, unlike the desktop builds - installation still requires a final tap in the system dialog)
+- Internet rooms can now be given a name when hosting, shown in the room history alongside the other players who were in it - much easier to recognize a room visited days ago than a bare 5-character code
+- Added a connection status indicator for network play: a disconnected player shows a small icon next to their name and the status text calls out that the game is waiting on them specifically. A player who reconnects while it was already their turn (turns are never auto-skipped, so multi-day games stay playable) now also gets the "it's your turn" reminder, not just everyone else
+- Shrunk the bottom control bar on phones: the pending move's point value is now a small badge above the board instead of a second status line, action buttons are more compact, and status/last-move messages now appear as auto-dismissing toasts instead of permanent banners
+- Fixed local (pass-and-play) tile placements silently failing with no visible reason when a placement was rejected - the error was recorded internally but the screen never redrew to show it
+- Made the opponent-move tile highlight more prominent (pink glow instead of amber, which blended into the orange tile color and was easy to miss)
 
 ## [0.9.18] - 2026-08-07
 
