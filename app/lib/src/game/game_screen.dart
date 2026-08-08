@@ -8,8 +8,10 @@ import '../settings/app_settings.dart';
 import 'game_controller.dart';
 import 'game_providers.dart';
 import 'widgets/board_view.dart';
+import 'widgets/compact_button_style.dart';
 import 'widgets/game_bottom_bar.dart';
 import 'widgets/hand_view.dart';
+import 'widgets/pending_score_badge.dart';
 import 'widgets/score_panel.dart';
 import 'widgets/turn_dialog.dart';
 
@@ -78,7 +80,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Qwirkle · Beutel: ${game.bag.remaining}'),
-        bottom: controller.isCurrentPlayerBot && !game.isOver && settings.animationsEnabled
+        bottom:
+            controller.isCurrentPlayerBot &&
+                !game.isOver &&
+                settings.animationsEnabled
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(28),
                 child: Padding(
@@ -99,9 +104,24 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               currentIndex: game.currentPlayerIndex,
             ),
             Expanded(
-              child: IgnorePointer(
-                ignoring: controller.isCurrentPlayerBot,
-                child: const BoardView(),
+              child: Stack(
+                children: [
+                  IgnorePointer(
+                    ignoring: controller.isCurrentPlayerBot,
+                    child: const BoardView(),
+                  ),
+                  if (controller.hasPendingPlacements &&
+                      controller.pendingScore != null)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: PendingScoreBadge(
+                        score: controller.pendingScore!,
+                        totalAfter:
+                            game.currentPlayer.score + controller.pendingScore!,
+                      ),
+                    ),
+                ],
               ),
             ),
             GameBottomBar(
@@ -171,15 +191,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       return 'Tauschmodus aktiv – wähle Steine aus deiner Hand aus.';
     }
     if (controller.hasPendingPlacements) {
-      final score = controller.pendingScore;
-      // Zwei getrennte Zahlen, damit der Punktwert dieses einen Zugs nicht
-      // mit dem laufenden Gesamtstand der Partie verwechselt wird (siehe
-      // Nutzer-Feedback: beide wurden für dieselbe Zahl gehalten).
-      final scoreSuffix = score != null
-          ? '\nDieser Zug: $score Punkt${score == 1 ? '' : 'e'} '
-                '· Gesamt danach: ${game.currentPlayer.score + score}'
-          : '';
-      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.$scoreSuffix';
+      // Der Punktwert dieses Zugs steht jetzt als eigenes Badge oben rechts
+      // über dem Brett (siehe [PendingScoreBadge]) statt als zweite Zeile
+      // hier - Nutzer-Feedback: das untere Menü ist auf dem Handy beim
+      // eigenen Zug viel zu groß.
+      return 'Zug vorbereitet – bestätige die Platzierung oder nimm sie zurück.';
     }
     if (controller.lastBotSummary != null) {
       return controller.lastBotSummary!;
@@ -267,12 +283,14 @@ class _ControlPanel extends ConsumerWidget {
           children: [
             if (!exchangeMode) ...[
               ElevatedButton(
+                style: compactButtonStyle,
                 onPressed: enabled && controller.hasPendingPlacements
                     ? controller.confirmMove
                     : null,
                 child: const Text('Zug bestätigen'),
               ),
               OutlinedButton(
+                style: compactButtonStyle,
                 onPressed: enabled && controller.hasPendingPlacements
                     ? controller.resetPendingPlacements
                     : null,
@@ -280,6 +298,7 @@ class _ControlPanel extends ConsumerWidget {
               ),
             ] else
               ElevatedButton(
+                style: compactButtonStyle,
                 onPressed: enabled && controller.hasExchangeSelection
                     ? () {
                         controller.confirmExchange();
@@ -289,11 +308,13 @@ class _ControlPanel extends ConsumerWidget {
                 child: const Text('Steine tauschen'),
               ),
             TextButton(
+              style: compactButtonStyle,
               onPressed: enabled ? onToggleMode : null,
               child: Text(exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
             ),
             if (canPass)
               OutlinedButton(
+                style: compactButtonStyle,
                 onPressed: controller.passTurn,
                 child: const Text('Aussetzen'),
               ),
