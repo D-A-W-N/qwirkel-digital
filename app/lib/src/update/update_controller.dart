@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import 'github_release_client.dart';
 import 'update_applier.dart';
+import 'update_applier_android.dart';
 import 'update_applier_linux.dart';
 import 'update_applier_macos.dart';
 import 'update_applier_windows.dart';
@@ -36,6 +37,8 @@ final updateApplierProvider = Provider<UpdateApplier>((ref) {
       return LinuxUpdateApplier(client);
     case UpdateTargetPlatform.windows:
       return WindowsUpdateApplier(client);
+    case UpdateTargetPlatform.android:
+      return AndroidUpdateApplier(client);
     case UpdateTargetPlatform.unsupported:
       return _UnsupportedUpdateApplier();
   }

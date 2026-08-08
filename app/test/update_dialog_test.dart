@@ -14,11 +14,18 @@ class _FixedUpdateController extends UpdateController {
   UpdateState build() => _initial;
 }
 
-Future<void> _pumpDialog(WidgetTester tester, UpdateState state) async {
+Future<void> _pumpDialog(
+  WidgetTester tester,
+  UpdateState state, {
+  UpdateTargetPlatform platform = UpdateTargetPlatform.macos,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        updateControllerProvider.overrideWith(() => _FixedUpdateController(state)),
+        updateControllerProvider.overrideWith(
+          () => _FixedUpdateController(state),
+        ),
+        targetPlatformProvider.overrideWithValue(platform),
       ],
       child: const MaterialApp(home: Scaffold(body: UpdateDialog())),
     ),
@@ -61,7 +68,26 @@ void main() {
     expect(find.text('Jetzt neu starten'), findsOneWidget);
   });
 
-  testWidgets('error phase shows the error message and a fallback link', (tester) async {
+  testWidgets(
+    'readyToRelaunch phase offers an install button on Android instead, '
+    'since there is no process restart there',
+    (tester) async {
+      await _pumpDialog(
+        tester,
+        const UpdateState(phase: UpdatePhase.readyToRelaunch),
+        platform: UpdateTargetPlatform.android,
+      );
+
+      expect(find.text('Bereit zur Installation'), findsOneWidget);
+      expect(find.text('Jetzt installieren'), findsOneWidget);
+      expect(find.text('Bereit zum Neustart'), findsNothing);
+      expect(find.text('Jetzt neu starten'), findsNothing);
+    },
+  );
+
+  testWidgets('error phase shows the error message and a fallback link', (
+    tester,
+  ) async {
     await _pumpDialog(
       tester,
       const UpdateState(

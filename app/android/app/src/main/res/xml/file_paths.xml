@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gibt das App-eigene Cache-Verzeichnis (= Flutters getTemporaryDirectory(),
+     siehe update_applier_android.dart) für den FileProvider frei, damit der
+     dorthin heruntergeladene Update-APK-Download dem System-Paketinstaller
+     als content://-URI übergeben werden kann. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="update_cache" path="." />
+</paths>

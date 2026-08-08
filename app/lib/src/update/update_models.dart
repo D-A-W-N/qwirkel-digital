@@ -1,13 +1,14 @@
 import 'dart:io';
 
-/// Desktop platforms the in-app updater knows how to apply an update on.
+/// Platforms the in-app updater knows how to apply an update on.
 /// Everything else is [unsupported] — the updater stays inert.
-enum UpdateTargetPlatform { macos, linux, windows, unsupported }
+enum UpdateTargetPlatform { macos, linux, windows, android, unsupported }
 
 UpdateTargetPlatform currentTargetPlatform() {
   if (Platform.isMacOS) return UpdateTargetPlatform.macos;
   if (Platform.isLinux) return UpdateTargetPlatform.linux;
   if (Platform.isWindows) return UpdateTargetPlatform.windows;
+  if (Platform.isAndroid) return UpdateTargetPlatform.android;
   return UpdateTargetPlatform.unsupported;
 }
 

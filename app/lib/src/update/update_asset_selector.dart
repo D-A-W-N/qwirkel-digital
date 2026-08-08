@@ -11,6 +11,7 @@ const _assetNamesByPlatform = {
   UpdateTargetPlatform.macos: 'qwirkle-digital-macos.zip',
   UpdateTargetPlatform.linux: 'qwirkle-digital-linux.tar.gz',
   UpdateTargetPlatform.windows: 'qwirkle-digital-windows.zip',
+  UpdateTargetPlatform.android: 'qwirkle-digital-android.apk',
 };
 
 /// Picks the release asset for [platform] plus its `.sha256` sidecar.
