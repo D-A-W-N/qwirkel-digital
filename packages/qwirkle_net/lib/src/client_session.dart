@@ -42,6 +42,12 @@ class ClientSession {
   /// Raum hat und daher [sendStartGame]/[sendRestartGame] aufrufen darf.
   bool isRoomOwner = false;
 
+  /// Nur `qwirkle_server`-Backend: der Name des Raums (vom Ersteller
+  /// vergeben oder vom Server als Fallback generiert) - vom [WelcomeMessage]
+  /// übernommen, damit auch beitretende (nicht nur erstellende) Personen
+  /// ihn kennen.
+  String? roomName;
+
   Stream<LobbyMessage> get lobbyUpdates => _lobbyController.stream;
   Stream<GameStateSnapshot> get stateUpdates {
     if (_latestSnapshot == null) {
@@ -69,7 +75,11 @@ class ClientSession {
   Future<void> connect(String host, int port, {required String name}) async {
     _statusController.add('Verbinde mit $host:$port');
     try {
-      final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+      final socket = await Socket.connect(
+        host,
+        port,
+        timeout: const Duration(seconds: 5),
+      );
       _statusController.add('Verbindung aufgebaut');
       await connectVia(TcpTransport(socket), name: name);
     } on SocketException catch (error) {
@@ -93,6 +103,7 @@ class ClientSession {
     required String name,
     String? roomCode,
     String? reconnectToken,
+    String? roomName,
   }) async {
     _transport = transport;
     _subscription = transport.lines.listen(
@@ -106,6 +117,7 @@ class ClientSession {
         name,
         roomCode: roomCode,
         reconnectToken: reconnectToken,
+        roomName: roomName,
       ).encode(),
     );
     await _welcomeController.stream.first;
@@ -127,6 +139,7 @@ class ClientSession {
       roomCode = message.roomCode;
       reconnectToken = message.reconnectToken;
       isRoomOwner = message.isOwner;
+      roomName = message.roomName;
       _welcomeController.add(message.playerId);
     } else if (message is LobbyMessage) {
       _statusController.add('Lobby aktualisiert');

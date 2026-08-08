@@ -42,13 +42,10 @@ class RoomManager {
   /// erste Nachricht, um ihn an den richtigen Raum weiterzureichen.
   void acceptTransport(MessageTransport transport) {
     StreamSubscription<String>? subscription;
-    subscription = transport.lines.listen(
-      (line) {
-        unawaited(subscription?.cancel());
-        _handleFirstLine(transport, line);
-      },
-      onError: (_) => transport.close(),
-    );
+    subscription = transport.lines.listen((line) {
+      unawaited(subscription?.cancel());
+      _handleFirstLine(transport, line);
+    }, onError: (_) => transport.close());
   }
 
   void _handleFirstLine(MessageTransport transport, String line) {
@@ -72,7 +69,7 @@ class RoomManager {
     RoomSession room;
     if (requestedCode == null) {
       final code = _generateRoomCode();
-      room = RoomSession(roomCode: code);
+      room = RoomSession(roomCode: code, roomName: message.roomName);
       room.onChanged = () => onRoomChanged?.call(room);
       _rooms[code] = room;
     } else {

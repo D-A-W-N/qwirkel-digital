@@ -37,6 +37,7 @@ Future<ClientSession> _connect(
   required String name,
   String? roomCode,
   String? reconnectToken,
+  String? roomName,
 }) async {
   final socket = await WebSocket.connect('ws://127.0.0.1:$port');
   final session = ClientSession();
@@ -45,6 +46,7 @@ Future<ClientSession> _connect(
     name: name,
     roomCode: roomCode,
     reconnectToken: reconnectToken,
+    roomName: roomName,
   );
   return session;
 }
@@ -73,6 +75,33 @@ void main() {
         expect(anna.reconnectToken, isNotNull);
         expect(anna.isRoomOwner, isTrue);
         expect(server.manager.room(anna.roomCode!), isNotNull);
+      },
+    );
+
+    test('Ein beim Erstellen vergebener Raumname wird gespeichert und auch '
+        'später beitretenden Personen mitgeteilt', () async {
+      final anna = await _connect(
+        port,
+        name: 'Anna',
+        roomName: 'Samstagsrunde',
+      );
+      addTearDown(anna.close);
+
+      expect(anna.roomName, 'Samstagsrunde');
+      expect(server.manager.room(anna.roomCode!)!.roomName, 'Samstagsrunde');
+
+      final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+      addTearDown(ben.close);
+      expect(ben.roomName, 'Samstagsrunde');
+    });
+
+    test(
+      'Ohne angegebenen Raumnamen vergibt der Server einen Fallback-Namen',
+      () async {
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
+
+        expect(anna.roomName, 'Raum ${anna.roomCode}');
       },
     );
 

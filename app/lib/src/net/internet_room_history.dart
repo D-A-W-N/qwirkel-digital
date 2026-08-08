@@ -20,12 +20,27 @@ class InternetRoomEntry {
   /// Historie gekennzeichnet sein".
   final bool isOver;
 
+  /// Vom Server bestätigter (vergebener oder als Fallback generierter) Name
+  /// des Raums - `null` bei bereits gespeicherten Einträgen aus früheren
+  /// Versionen, die das Feld noch nicht kennen; die Anzeige fällt dann auf
+  /// [roomCode] zurück. Siehe Nutzer-Feedback "Räume sollten auch Namen
+  /// bekommen damit man sie wiederfindet".
+  final String? roomName;
+
+  /// Zuletzt bekannte Namen der Mitspieler:innen in diesem Raum (ohne die
+  /// eigene Person) - hilft, einen Raum in der Historie wiederzuerkennen,
+  /// wenn der Name allein nicht reicht. Siehe Nutzer-Feedback "eine Liste
+  /// der Spieler anzeigen".
+  final List<String> playerNames;
+
   const InternetRoomEntry({
     required this.roomCode,
     required this.playerName,
     required this.reconnectToken,
     required this.lastSeen,
     this.isOver = false,
+    this.roomName,
+    this.playerNames = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -34,6 +49,8 @@ class InternetRoomEntry {
     'reconnectToken': reconnectToken,
     'lastSeen': lastSeen.toIso8601String(),
     'isOver': isOver,
+    if (roomName != null) 'roomName': roomName,
+    if (playerNames.isNotEmpty) 'playerNames': playerNames,
   };
 
   factory InternetRoomEntry.fromJson(Map<String, dynamic> json) =>
@@ -45,6 +62,10 @@ class InternetRoomEntry {
         // Bereits gespeicherte Einträge aus früheren Versionen kennen das
         // Feld noch nicht - dann galt implizit "nicht beendet".
         isOver: json['isOver'] as bool? ?? false,
+        roomName: json['roomName'] as String?,
+        playerNames: json['playerNames'] != null
+            ? List<String>.from(json['playerNames'] as List<dynamic>)
+            : const [],
       );
 }
 

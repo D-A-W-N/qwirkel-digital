@@ -106,7 +106,9 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       if (mounted && initialSnapshot != null) {
         setState(() {
           _snapshot = initialSnapshot;
-          _ownHand = initialSnapshot.players[initialSnapshot.yourPlayerIndex].hand ?? const <Tile>[];
+          _ownHand =
+              initialSnapshot.players[initialSnapshot.yourPlayerIndex].hand ??
+              const <Tile>[];
           _status = 'Host-Zustand aktualisiert';
         });
       }
@@ -129,13 +131,15 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     await session.connectVia(
       WebSocketTransport(socket),
       name: widget.config.effectiveName,
+      roomName: widget.config.roomName.isEmpty ? null : widget.config.roomName,
     );
     await _rememberSession(session);
     _afterClientConnected(session);
     if (!mounted) return;
     setState(() {
       _inviteCode = session.roomCode;
-      _status = 'Raum erstellt – Einladungscode: ${session.roomCode}';
+      _status =
+          'Raum "${session.roomName}" erstellt – Einladungscode: ${session.roomCode}';
     });
   }
 
@@ -158,7 +162,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       if (snapshot == null) return;
       setState(() {
         _snapshot = snapshot;
-        _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+        _ownHand =
+            snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
         _status = 'Host-Zustand aktualisiert';
         _errorText = null;
       });
@@ -242,7 +247,10 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   /// Neustart (Owner startet erneut, `isOver` wird wieder `false`) auch
   /// dann in der Historie ankommt, wenn die Partie in einer anderen
   /// Sitzung/an einem anderen Tag beendet wurde.
-  Future<void> _rememberSession(ClientSession session, {bool isOver = false}) async {
+  Future<void> _rememberSession(
+    ClientSession session, {
+    bool isOver = false,
+  }) async {
     final roomCode = session.roomCode;
     final token = session.reconnectToken;
     if (roomCode == null || token == null) return;
@@ -253,6 +261,19 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         reconnectToken: token,
         lastSeen: DateTime.now(),
         isOver: isOver,
+        roomName: session.roomName,
+        // Nur die MITSPIELER:innen, nicht die eigene Person - die kennt man
+        // ja schon (siehe playerName). Bevorzugt aus dem Spielstand (auch
+        // nach Spielstart noch aktuell), sonst aus der Lobby-Liste (vor
+        // Spielstart) - `_lobbyPlayers` wird nach Spielstart nicht mehr
+        // aktualisiert, da keine `LobbyMessage`s mehr eintreffen.
+        playerNames: [
+          for (final name
+              in _snapshot != null
+                  ? [for (final p in _snapshot!.players) p.name]
+                  : [for (final p in _lobbyPlayers) p.name])
+            if (name != widget.config.effectiveName) name,
+        ],
       ),
     );
   }
@@ -274,7 +295,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       setState(() {
         _snapshot = snapshot;
         _gameStarted = true;
-        _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+        _ownHand =
+            snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
         _status = 'Spielzustand empfangen (${snapshot.players.length} Spieler)';
         _errorText = null;
       });
@@ -353,7 +375,10 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       roomCode: roomCode,
       reconnectToken: saved.isEmpty ? null : saved.first.reconnectToken,
     );
-    await _rememberSession(session, isOver: session.latestSnapshot?.isOver ?? false);
+    await _rememberSession(
+      session,
+      isOver: session.latestSnapshot?.isOver ?? false,
+    );
     unawaited(_clientSession?.close());
     _afterClientConnected(session);
   }
@@ -364,7 +389,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       if (mounted) {
         setState(() {
           _snapshot = snapshot;
-          _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+          _ownHand =
+              snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
           _gameStarted = true;
         });
       }
@@ -393,7 +419,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       setState(() {
         _snapshot = snapshot;
         _gameStarted = true;
-        _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+        _ownHand =
+            snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
         _status = 'Spiel gestartet';
       });
     } else if (_hasOwnerControls) {
@@ -418,7 +445,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       setState(() {
         _snapshot = snapshot;
         _gameStarted = true;
-        _ownHand = snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
+        _ownHand =
+            snapshot.players[snapshot.yourPlayerIndex].hand ?? const <Tile>[];
         _status = 'Neue Partie gestartet';
       });
     } else if (_hasOwnerControls) {
@@ -501,8 +529,8 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         // ist.
         canInteract:
             _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex &&
-                !_snapshot!.isOver &&
-                !_reconnecting,
+            !_snapshot!.isOver &&
+            !_reconnecting,
         onSendMove: _sendMove,
         onSendPass: _sendPass,
         onSendExchange: _sendExchange,
@@ -539,7 +567,10 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                     title: const Text('Erreichbar unter'),
                     subtitle: SelectableText(
                       _localAddresses
-                          .map((address) => '$address:${_hostSession?.port ?? widget.config.effectivePort}')
+                          .map(
+                            (address) =>
+                                '$address:${_hostSession?.port ?? widget.config.effectivePort}',
+                          )
                           .join(' oder '),
                     ),
                   ),
@@ -563,11 +594,11 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                   subtitle: Text(
                     isHosting
                         ? (_gameStarted || _snapshot != null
-                            ? 'Die Partie ist aktiv.'
-                            : 'Wartet auf Mitspieler:innen.')
+                              ? 'Die Partie ist aktiv.'
+                              : 'Wartet auf Mitspieler:innen.')
                         : (_gameStarted || _snapshot != null
-                            ? 'Spiel läuft bereits – der aktuelle Stand wird angezeigt.'
-                            : 'Verbunden und wartet auf Updates.'),
+                              ? 'Spiel läuft bereits – der aktuelle Stand wird angezeigt.'
+                              : 'Verbunden und wartet auf Updates.'),
                   ),
                 ),
               ),
@@ -596,7 +627,10 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                     leading: const Icon(Icons.person),
                     title: Text(player.name),
                     trailing: _snapshot != null || _gameStarted
-                        ? Icon(Icons.play_circle_fill, color: Colors.green.shade700)
+                        ? Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.green.shade700,
+                          )
                         : Icon(Icons.pending, color: Colors.orange.shade700),
                   ),
                 ),
