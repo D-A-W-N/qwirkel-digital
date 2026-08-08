@@ -73,7 +73,14 @@ class GameController extends ChangeNotifier {
       lastBotPlacements = {};
       lastBotSummary = null;
     } on InvalidMoveException catch (e) {
+      // notifyListeners() darf hier NICHT übersprungen werden: ohne ihn
+      // bleibt `lastError` zwar gesetzt, aber die UI (ref.watch) bekommt nie
+      // mit, dass sich der Zustand geändert hat, und zeigt weder eine
+      // Fehlermeldung noch sonst eine Reaktion - der Zug scheint einfach
+      // stillschweigend zu scheitern (Nutzer-Feedback: "konnte keinen
+      // anderen Stein platzieren, scheint mir ein Bug").
       lastError = _humanReadableMessage(e.reason, e.message);
+      notifyListeners();
       return;
     }
 

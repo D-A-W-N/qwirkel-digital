@@ -93,6 +93,48 @@ void main() {
   });
 
   test(
+    'stageTile benachrichtigt Listener auch bei einer fehlgeschlagenen Platzierung',
+    () {
+      // Regression: die UI hört per ChangeNotifier zu (ref.watch) - ohne
+      // notifyListeners() im Fehlerfall bleibt lastError zwar gesetzt, aber
+      // der Bildschirm baut nie neu, sodass der Fehler unsichtbar bleibt und
+      // eine fehlgeschlagene Platzierung wie ein stillschweigend hängender
+      // Bug wirkt (Nutzer-Feedback: "konnte keinen anderen Stein platzieren,
+      // scheint mir ein Bug").
+      final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
+      final controller = GameController(game);
+
+      game.currentPlayer.hand = [
+        const Tile(TileColor.red, TileShape.circle),
+        const Tile(TileColor.red, TileShape.cross),
+      ];
+      game.board.apply([
+        TilePlacement(
+          position: const Position(0, 0),
+          tile: const Tile(TileColor.red, TileShape.diamond),
+        ),
+      ]);
+
+      controller.stageTile(0, const Position(1, 0));
+
+      var notifyCount = 0;
+      controller.addListener(() => notifyCount++);
+
+      // Lücke bei (2,0) -> schlägt fehl.
+      controller.stageTile(1, const Position(3, 0));
+
+      expect(controller.lastError, isNotNull);
+      expect(
+        notifyCount,
+        greaterThan(0),
+        reason:
+            'notifyListeners() muss auch bei InvalidMoveException aufgerufen '
+            'werden, sonst erfährt die UI nie von der Fehlermeldung.',
+      );
+    },
+  );
+
+  test(
     'playBotTurn füllt lastBotSummary/lastBotPlacements, die eigene Reaktion löscht sie wieder',
     () {
       final bot = Player(
