@@ -9,10 +9,12 @@ void main() {
     'NetworkGameView zeigt einen übergebenen Status-Text als Toast an, der '
     'von selbst wieder verschwindet',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       final snapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = snapshot.players[0].hand ?? <Tile>[];
 
@@ -46,10 +48,12 @@ void main() {
     'Die Statuszeile nennt beim Warten den Namen der Person, die am Zug ist, '
     'statt einer separaten "Aktueller Zug"-Zeile',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.currentPlayerIndex = 1;
       final snapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = snapshot.players[0].hand ?? <Tile>[];
@@ -75,13 +79,74 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Ist die Person, die am Zug ist, nicht verbunden, wird das statt eines '
+    'generischen Wartens explizit genannt',
+    (tester) async {
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
+      game.currentPlayerIndex = 1;
+      final baseSnapshot = GameStateSnapshot.forRecipient(game, 0);
+      final disconnectedSnapshot = GameStateSnapshot(
+        players: [
+          baseSnapshot.players[0],
+          PlayerView(
+            id: baseSnapshot.players[1].id,
+            name: baseSnapshot.players[1].name,
+            score: baseSnapshot.players[1].score,
+            isBot: baseSnapshot.players[1].isBot,
+            handCount: baseSnapshot.players[1].handCount,
+            connected: false,
+          ),
+        ],
+        currentPlayerIndex: baseSnapshot.currentPlayerIndex,
+        bagRemaining: baseSnapshot.bagRemaining,
+        isOver: baseSnapshot.isOver,
+        board: baseSnapshot.board,
+        yourPlayerIndex: baseSnapshot.yourPlayerIndex,
+      );
+      final hand = disconnectedSnapshot.players[0].hand ?? <Tile>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkGameView(
+            snapshot: disconnectedSnapshot,
+            ownHand: hand,
+            canInteract: false,
+            onSendMove: (placements) async => true,
+            onSendPass: () {},
+            onSendExchange: (tiles) {},
+            isRoomOwner: false,
+            onRestartGame: () {},
+          ),
+        ),
+      );
+
+      expect(
+        find.text(
+          'Bob ist nicht verbunden – die Partie wartet auf eine Rückkehr.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Warte auf Bob.'), findsNothing);
+      // Score-Panel: das Trennungs-Symbol erscheint neben Bobs Namen.
+      expect(find.byIcon(Icons.wifi_off), findsOneWidget);
+    },
+  );
+
   testWidgets('NetworkGameView zeigt einen Spielende-Dialog mit Gewinnern an', (
     tester,
   ) async {
-    final game = QwirkleGame(players: [
-      Player(id: 'p1', name: 'Alice'),
-      Player(id: 'p2', name: 'Bob'),
-    ]);
+    final game = QwirkleGame(
+      players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ],
+    );
     game.players[0].score = 11;
     game.players[1].score = 7;
     game.isOver = true;
@@ -119,10 +184,12 @@ void main() {
     'Nur die Person mit Owner-Rechten sieht den Neustart-Button im Partie-Ende-Overlay, '
     'ein Tippen darauf löst onRestartGame aus',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.isOver = true;
       final snapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = snapshot.players[0].hand ?? <Tile>[];
@@ -145,7 +212,9 @@ void main() {
 
       expect(find.text('Neues Spiel'), findsNothing);
       expect(
-        find.text('Warte, bis der/die Raumersteller:in eine neue Partie startet.'),
+        find.text(
+          'Warte, bis der/die Raumersteller:in eine neue Partie startet.',
+        ),
         findsOneWidget,
       );
 
@@ -179,10 +248,12 @@ void main() {
   );
 
   testWidgets('NetworkGameView zeigt eine kurze Spielhilfe an', (tester) async {
-    final game = QwirkleGame(players: [
-      Player(id: 'p1', name: 'Alice'),
-      Player(id: 'p2', name: 'Bob'),
-    ]);
+    final game = QwirkleGame(
+      players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ],
+    );
     final snapshot = GameStateSnapshot.forRecipient(game, 0);
     final hand = snapshot.players[0].hand ?? <Tile>[];
 
@@ -212,10 +283,12 @@ void main() {
   testWidgets('NetworkGameView sendet einen lokalen Zug an den Host', (
     tester,
   ) async {
-    final game = QwirkleGame(players: [
-      Player(id: 'p1', name: 'Alice'),
-      Player(id: 'p2', name: 'Bob'),
-    ]);
+    final game = QwirkleGame(
+      players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ],
+    );
     game.currentPlayerIndex = 0;
     final snapshot = GameStateSnapshot.forRecipient(game, 0);
     final hand = snapshot.players[0].hand ?? <Tile>[];
@@ -273,10 +346,12 @@ void main() {
   testWidgets(
     'Eine ungültige Platzierung wird sofort live abgelehnt, ohne den Stein zu platzieren',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.currentPlayerIndex = 0;
       final snapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = snapshot.players[0].hand ?? <Tile>[];
@@ -326,10 +401,12 @@ void main() {
   testWidgets(
     'Bei einem vom Server abgelehnten Zug bleibt die vorläufige Platzierung sichtbar und der Fehler wird angezeigt',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.currentPlayerIndex = 0;
       final snapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = snapshot.players[0].hand ?? <Tile>[];
@@ -377,113 +454,126 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Aussetzen ist nur möglich, wenn der Beutel leer ist',
-    (tester) async {
-      final gameWithFullBag = QwirkleGame(players: [
+  testWidgets('Aussetzen ist nur möglich, wenn der Beutel leer ist', (
+    tester,
+  ) async {
+    final gameWithFullBag = QwirkleGame(
+      players: [
         Player(id: 'p1', name: 'Alice'),
         Player(id: 'p2', name: 'Bob'),
-      ]);
-      gameWithFullBag.currentPlayerIndex = 0;
-      final snapshotWithFullBag = GameStateSnapshot.forRecipient(gameWithFullBag, 0);
+      ],
+    );
+    gameWithFullBag.currentPlayerIndex = 0;
+    final snapshotWithFullBag = GameStateSnapshot.forRecipient(
+      gameWithFullBag,
+      0,
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkGameView(
-            snapshot: snapshotWithFullBag,
-            ownHand: snapshotWithFullBag.players[0].hand ?? <Tile>[],
-            canInteract: true,
-            onSendMove: (placements) async => true,
-            onSendPass: () {},
-            onSendExchange: (tiles) {},
-            isRoomOwner: false,
-            onRestartGame: () {},
-          ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkGameView(
+          snapshot: snapshotWithFullBag,
+          ownHand: snapshotWithFullBag.players[0].hand ?? <Tile>[],
+          canInteract: true,
+          onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
         ),
-      );
-      expect(find.text('Aussetzen'), findsNothing);
+      ),
+    );
+    expect(find.text('Aussetzen'), findsNothing);
 
-      final gameWithEmptyBag = QwirkleGame(
-        players: [Player(id: 'p1', name: 'Alice'), Player(id: 'p2', name: 'Bob')],
-        bag: TileBag.fromTiles(const []),
-      );
-      gameWithEmptyBag.currentPlayerIndex = 0;
-      final snapshotWithEmptyBag = GameStateSnapshot.forRecipient(gameWithEmptyBag, 0);
-
-      var passed = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkGameView(
-            snapshot: snapshotWithEmptyBag,
-            ownHand: snapshotWithEmptyBag.players[0].hand ?? <Tile>[],
-            canInteract: true,
-            onSendMove: (placements) async => true,
-            onSendPass: () => passed = true,
-            onSendExchange: (tiles) {},
-            isRoomOwner: false,
-            onRestartGame: () {},
-          ),
-        ),
-      );
-
-      expect(find.text('Aussetzen'), findsOneWidget);
-      await tester.tap(find.text('Aussetzen'));
-      expect(passed, isTrue);
-    },
-  );
-
-  testWidgets(
-    'Im Tausch-Modus ausgewählte Steine werden getauscht',
-    (tester) async {
-      final game = QwirkleGame(players: [
+    final gameWithEmptyBag = QwirkleGame(
+      players: [
         Player(id: 'p1', name: 'Alice'),
         Player(id: 'p2', name: 'Bob'),
-      ]);
-      game.currentPlayerIndex = 0;
-      final snapshot = GameStateSnapshot.forRecipient(game, 0);
-      final hand = snapshot.players[0].hand ?? <Tile>[];
+      ],
+      bag: TileBag.fromTiles(const []),
+    );
+    gameWithEmptyBag.currentPlayerIndex = 0;
+    final snapshotWithEmptyBag = GameStateSnapshot.forRecipient(
+      gameWithEmptyBag,
+      0,
+    );
 
-      List<Tile>? exchangedTiles;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkGameView(
-            snapshot: snapshot,
-            ownHand: hand,
-            canInteract: true,
-            onSendMove: (placements) async => true,
-            onSendPass: () {},
-            onSendExchange: (tiles) => exchangedTiles = tiles,
-            isRoomOwner: false,
-            onRestartGame: () {},
-          ),
+    var passed = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkGameView(
+          snapshot: snapshotWithEmptyBag,
+          ownHand: snapshotWithEmptyBag.players[0].hand ?? <Tile>[],
+          canInteract: true,
+          onSendMove: (placements) async => true,
+          onSendPass: () => passed = true,
+          onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
         ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 800));
-      await tester.tap(find.text('Los geht’s'));
-      await tester.pump();
+      ),
+    );
 
-      await tester.tap(find.text('Steine tauschen…'));
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('hand-0')));
-      await tester.pump();
-      await tester.tap(find.text('Steine tauschen'));
-      await tester.pump();
+    expect(find.text('Aussetzen'), findsOneWidget);
+    await tester.tap(find.text('Aussetzen'));
+    expect(passed, isTrue);
+  });
 
-      expect(exchangedTiles, [hand[0]]);
-      // Der Tausch-Modus wird nach dem Bestätigen wieder verlassen.
-      expect(find.text('Steine tauschen…'), findsOneWidget);
-    },
-  );
+  testWidgets('Im Tausch-Modus ausgewählte Steine werden getauscht', (
+    tester,
+  ) async {
+    final game = QwirkleGame(
+      players: [
+        Player(id: 'p1', name: 'Alice'),
+        Player(id: 'p2', name: 'Bob'),
+      ],
+    );
+    game.currentPlayerIndex = 0;
+    final snapshot = GameStateSnapshot.forRecipient(game, 0);
+    final hand = snapshot.players[0].hand ?? <Tile>[];
+
+    List<Tile>? exchangedTiles;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkGameView(
+          snapshot: snapshot,
+          ownHand: hand,
+          canInteract: true,
+          onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) => exchangedTiles = tiles,
+          isRoomOwner: false,
+          onRestartGame: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.tap(find.text('Los geht’s'));
+    await tester.pump();
+
+    await tester.tap(find.text('Steine tauschen…'));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('hand-0')));
+    await tester.pump();
+    await tester.tap(find.text('Steine tauschen'));
+    await tester.pump();
+
+    expect(exchangedTiles, [hand[0]]);
+    // Der Tausch-Modus wird nach dem Bestätigen wieder verlassen.
+    expect(find.text('Steine tauschen…'), findsOneWidget);
+  });
 
   testWidgets(
     'Zeigt eine Zusammenfassung des letzten fremden Zugs als Toast an, aber '
     'nicht für den eigenen',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.currentPlayerIndex = 0;
       final baseSnapshot = GameStateSnapshot.forRecipient(game, 0);
 
@@ -514,7 +604,10 @@ void main() {
         isOver: baseSnapshot.isOver,
         board: baseSnapshot.board,
         yourPlayerIndex: baseSnapshot.yourPlayerIndex,
-        lastMove: const LastMoveInfo(playerIndex: 1, kind: LastMoveKind.exchanged),
+        lastMove: const LastMoveInfo(
+          playerIndex: 1,
+          kind: LastMoveKind.exchanged,
+        ),
       );
       await tester.pumpWidget(buildView(snapshotWithOthersMove));
       await tester.pump();
@@ -547,10 +640,12 @@ void main() {
       // Zurücknehmen wurde der zugehörige (veraltete) Hand-Index auf die
       // komplett neue Hand angewendet, was einen falschen Stein aus-/wieder
       // einblendete.
-      final gameA = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final gameA = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       gameA.currentPlayerIndex = 0;
       final inProgressSnapshot = GameStateSnapshot.forRecipient(gameA, 0);
       final handA = inProgressSnapshot.players[0].hand ?? <Tile>[];
@@ -599,10 +694,12 @@ void main() {
       await tester.pump();
 
       // Neustart: komplett frisches Spiel mit unabhängig ausgeteilter Hand.
-      final gameB = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final gameB = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       gameB.currentPlayerIndex = 0;
       final restartedSnapshot = GameStateSnapshot.forRecipient(gameB, 0);
       final handB = restartedSnapshot.players[0].hand ?? <Tile>[];
@@ -638,10 +735,12 @@ void main() {
     'Die untere Leiste zeigt die Hand immer sofort an, ohne dass man sie '
     'erst ausklappen müsste',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.currentPlayerIndex = 0;
       final snapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = snapshot.players[0].hand ?? <Tile>[];
@@ -676,10 +775,12 @@ void main() {
   testWidgets(
     'Ein wegklickbarer Dialog macht es unübersehbar, wenn man selbst am Zug ist',
     (tester) async {
-      final game = QwirkleGame(players: [
-        Player(id: 'p1', name: 'Alice'),
-        Player(id: 'p2', name: 'Bob'),
-      ]);
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
       game.currentPlayerIndex = 1;
       final waitingSnapshot = GameStateSnapshot.forRecipient(game, 0);
       final hand = waitingSnapshot.players[0].hand ?? <Tile>[];
@@ -727,6 +828,59 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Du bist am Zug'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Wird während eines laufenden eigenen Zugs die Verbindung wiederhergestellt, '
+    'erscheint der Zug-Hinweis trotzdem (kein Zugwechsel, aber canInteract '
+    'wechselt false -> true)',
+    (tester) async {
+      // Regression: die Partie überspringt eine getrennte Person nicht
+      // automatisch, es kann also schon vor der Trennung ihr Zug gewesen
+      // sein und bleibt es danach unverändert - `currentPlayerIndex` ändert
+      // sich dann gar nicht, weshalb der normale "wurde mein Zug"-Trigger
+      // nicht anspringt. Nutzer-Feedback: "andersrum sollte der Spieler,
+      // der am Zug ist, auch drauf hingewiesen werden".
+      final game = QwirkleGame(
+        players: [
+          Player(id: 'p1', name: 'Alice'),
+          Player(id: 'p2', name: 'Bob'),
+        ],
+      );
+      game.currentPlayerIndex = 0; // bereits mein Zug, vor der Trennung.
+      final snapshot = GameStateSnapshot.forRecipient(game, 0);
+      final hand = snapshot.players[0].hand ?? <Tile>[];
+
+      Widget buildView({required bool canInteract}) => MaterialApp(
+        home: NetworkGameView(
+          snapshot: snapshot,
+          ownHand: hand,
+          canInteract: canInteract,
+          onSendMove: (placements) async => true,
+          onSendPass: () {},
+          onSendExchange: (tiles) {},
+          isRoomOwner: false,
+          onRestartGame: () {},
+        ),
+      );
+
+      // Während der Trennung/Reconnect-Versuche blockt der Bildschirm die
+      // Interaktion (siehe `network_game_screen.dart`s `_reconnecting`).
+      await tester.pumpWidget(buildView(canInteract: false));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.tap(find.text('Los geht’s'));
+      await tester.pump();
+
+      expect(find.text('Du bist am Zug'), findsNothing);
+
+      // Reconnect erfolgreich: canInteract wird wieder true, derselbe Zug.
+      await tester.pumpWidget(buildView(canInteract: true));
+      await tester.pump();
+
+      expect(find.text('Du bist am Zug'), findsOneWidget);
+      expect(find.text('Du bist jetzt am Zug.'), findsOneWidget);
     },
   );
 }
