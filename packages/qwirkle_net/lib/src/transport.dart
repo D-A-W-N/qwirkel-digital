@@ -33,7 +33,20 @@ class TcpTransport implements MessageTransport {
   Stream<String> get lines => _lines;
 
   @override
-  void send(String line) => _socket.write(line);
+  void send(String line) {
+    // Best-effort: der Peer kann die Verbindung genau zwischen unserem
+    // letzten Zustands-Check und diesem Aufruf beendet haben (z. B. beim
+    // Broadcast an alle Sitzplätze direkt nach einer Trennung). Der
+    // Empfang der eigentlichen Trennung läuft ohnehin separat über
+    // `onDone`/`onError` des Sockets - ein fehlgeschlagener Sendeversuch
+    // darf den Aufrufer (`RoomSession._broadcastState` u. Ä.) nicht mit
+    // einer unbehandelten Ausnahme abreißen lassen.
+    try {
+      _socket.write(line);
+    } on SocketException {
+      // Ignorieren - siehe oben.
+    }
+  }
 
   @override
   Future<void> close() => _socket.close();
@@ -67,7 +80,18 @@ class WebSocketTransport implements MessageTransport {
   Stream<String> get lines => _linesController.stream;
 
   @override
-  void send(String line) => _socket.add(line);
+  void send(String line) {
+    // Best-effort - siehe dieselbe Begründung bei TcpTransport.send: der
+    // WebSocket kann zwischen Zustands-Check und Sendeversuch bereits
+    // geschlossen worden sein (z. B. beim Broadcast direkt nach einer
+    // Trennung), was `StreamSink`-intern als `StateError` auffliegt statt
+    // als `SocketException`.
+    try {
+      _socket.add(line);
+    } on StateError {
+      // Ignorieren - siehe oben.
+    }
+  }
 
   @override
   Future<void> close() async {
