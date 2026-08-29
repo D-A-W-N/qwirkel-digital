@@ -36,64 +36,58 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Spielziel'), findsOneWidget);
-      expect(
-        find.text('Bilde Reihen aus Farben oder Formen.'),
-        findsOneWidget,
-      );
+      expect(find.text('Bilde Reihen aus Farben oder Formen.'), findsOneWidget);
       expect(find.text('Hausregeln dieser App'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Startspieler:in'), 200);
       expect(find.text('Startspieler:in'), findsOneWidget);
     },
   );
 
-  testWidgets(
-    'Der Update-Bereich im Einstellungen-Sheet bleibt bei großer '
-    'Systemschrift/kleinem Fenster erreichbar (scrollbar)',
-    (tester) async {
-      // Simuliert die Situation eines sehbehinderten Nutzers mit stark
-      // vergrößerter Systemschrift auf einem eher kleinen Fenster - vorher
-      // war das Sheet nicht scrollbar und der Update-Bereich (weit unten in
-      // der Liste) dadurch weder sichtbar noch antippbar.
-      // Breit genug, damit die (von diesem Fix unabhängigen) horizontalen
-      // Zeilen der Spieler-Konfiguration bei größerer Schrift nicht
-      // überlaufen - schmal in der Höhe ist hier der relevante Engpass.
-      tester.view.physicalSize = const Size(1400, 500);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Der Update-Bereich im Einstellungen-Sheet bleibt bei großer '
+      'Systemschrift/kleinem Fenster erreichbar (scrollbar)', (tester) async {
+    // Simuliert die Situation eines sehbehinderten Nutzers mit stark
+    // vergrößerter Systemschrift auf einem eher kleinen Fenster - vorher
+    // war das Sheet nicht scrollbar und der Update-Bereich (weit unten in
+    // der Liste) dadurch weder sichtbar noch antippbar.
+    // Breit genug, damit die (von diesem Fix unabhängigen) horizontalen
+    // Zeilen der Spieler-Konfiguration bei größerer Schrift nicht
+    // überlaufen - schmal in der Höhe ist hier der relevante Engpass.
+    tester.view.physicalSize = const Size(1400, 500);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: const TextScaler.linear(1.6)),
-              child: child!,
-            ),
-            home: const SetupScreen(),
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.6)),
+            child: child!,
           ),
+          home: const SetupScreen(),
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.text('Einstellungen'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Einstellungen'));
+    await tester.pumpAndSettle();
 
-      await tester.scrollUntilVisible(
-        find.text('Nach Updates suchen'),
-        200,
-        scrollable: find.descendant(
-          of: find.byKey(const Key('settingsSheetScrollView')),
-          matching: find.byType(Scrollable),
-        ),
-      );
-      expect(find.text('Nach Updates suchen'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Nach Updates suchen'),
+      200,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('settingsSheetScrollView')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(find.text('Nach Updates suchen'), findsOneWidget);
 
-      // Muss auch tatsächlich antippbar sein, nicht nur im Baum vorhanden.
-      await tester.tap(find.text('Nach Updates suchen'));
-      await tester.pump();
-    },
-  );
+    // Muss auch tatsächlich antippbar sein, nicht nur im Baum vorhanden.
+    await tester.tap(find.text('Nach Updates suchen'));
+    await tester.pump();
+  });
 
   testWidgets(
     'Einstellungen-Sheet zeigt einen Design-Umschalter mit System/Hell/Dunkel',
@@ -127,21 +121,37 @@ void main() {
     expect(container.read(appSettingsProvider).botSpeed, BotSpeed.normal);
     expect(container.read(appSettingsProvider).themeMode, ThemeMode.system);
 
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(animationsEnabled: false);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(tipsEnabled: false);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(updateCheckEnabled: false);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(botSpeed: BotSpeed.fast);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(themeMode: ThemeMode.dark);
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(animationsEnabled: false),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container.read(appSettingsProvider).copyWith(tipsEnabled: false),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(updateCheckEnabled: false),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container.read(appSettingsProvider).copyWith(botSpeed: BotSpeed.fast),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(themeMode: ThemeMode.dark),
+        );
 
     final settings = container.read(appSettingsProvider);
     expect(settings.animationsEnabled, isFalse);
@@ -155,20 +165,22 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(
-          animationsEnabled: false,
-          tipsEnabled: false,
-          updateCheckEnabled: false,
-          botSpeed: BotSpeed.slow,
-          themeMode: ThemeMode.dark,
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(
+                animationsEnabled: false,
+                tipsEnabled: false,
+                updateCheckEnabled: false,
+                botSpeed: BotSpeed.slow,
+                themeMode: ThemeMode.dark,
+              ),
         );
 
     try {
-      await resetAppSettings(
-        container,
-      );
+      await resetAppSettings(container);
     } catch (error) {
       final settings = container.read(appSettingsProvider);
       expect(settings.animationsEnabled, isTrue);

@@ -137,8 +137,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                           final nextSettings = ref
                               .read(appSettingsProvider)
                               .copyWith(animationsEnabled: value);
-                          ref.read(appSettingsProvider.notifier).state =
-                              nextSettings;
+                          ref
+                              .read(appSettingsProvider.notifier)
+                              .update(nextSettings);
                           await saveAppSettings(nextSettings);
                         },
                         title: const Text('Animationen'),
@@ -152,8 +153,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                           final nextSettings = ref
                               .read(appSettingsProvider)
                               .copyWith(tipsEnabled: value);
-                          ref.read(appSettingsProvider.notifier).state =
-                              nextSettings;
+                          ref
+                              .read(appSettingsProvider.notifier)
+                              .update(nextSettings);
                           await saveAppSettings(nextSettings);
                         },
                         title: const Text('Hinweise'),
@@ -190,8 +192,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                 final nextSettings = ref
                                     .read(appSettingsProvider)
                                     .copyWith(botSpeed: selection.first);
-                                ref.read(appSettingsProvider.notifier).state =
-                                    nextSettings;
+                                ref
+                                    .read(appSettingsProvider.notifier)
+                                    .update(nextSettings);
                                 await saveAppSettings(nextSettings);
                               },
                             ),
@@ -232,8 +235,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                 final nextSettings = ref
                                     .read(appSettingsProvider)
                                     .copyWith(themeMode: selection.first);
-                                ref.read(appSettingsProvider.notifier).state =
-                                    nextSettings;
+                                ref
+                                    .read(appSettingsProvider.notifier)
+                                    .update(nextSettings);
                                 await saveAppSettings(nextSettings);
                               },
                             ),
@@ -383,7 +387,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                             child: ExcludeSemantics(
                               child: Text(
                                 '$_playerCount',
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
                               ),
                             ),
                           ),
@@ -416,23 +422,28 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                 children: [
                                   Expanded(
                                     child: FilledButton.tonal(
-                                      onPressed: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const NetworkLobbyScreen(),
-                                        ),
+                                      onPressed: () =>
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const NetworkLobbyScreen(),
+                                            ),
+                                          ),
+                                      child: const Text(
+                                        'Netzwerk-Setup öffnen',
                                       ),
-                                      child: const Text('Netzwerk-Setup öffnen'),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: OutlinedButton(
-                                      onPressed: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => const MyRoomsScreen(),
-                                        ),
-                                      ),
+                                      onPressed: () =>
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const MyRoomsScreen(),
+                                            ),
+                                          ),
                                       child: const Text('Meine Räume'),
                                     ),
                                   ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wie lange die KI vor jedem Zug "nachdenkt", bevor sie ihn ausführt -
@@ -68,9 +67,20 @@ class AppSettings {
   }
 }
 
-final appSettingsProvider = StateProvider<AppSettings>((ref) {
-  return AppSettings.defaults();
-});
+/// Hält die aktuellen [AppSettings]. Die Notifier-`state`-Setzung ist laut
+/// Riverpod-API `@protected` (nur für Zugriffe innerhalb dieser Klasse
+/// gedacht) - externe Aufrufer setzen den Zustand daher über [update], nicht
+/// direkt über `.notifier.state =`.
+class AppSettingsNotifier extends Notifier<AppSettings> {
+  @override
+  AppSettings build() => AppSettings.defaults();
+
+  void update(AppSettings settings) => state = settings;
+}
+
+final appSettingsProvider = NotifierProvider<AppSettingsNotifier, AppSettings>(
+  AppSettingsNotifier.new,
+);
 
 Future<void> initializeAppSettings(WidgetRef ref) async {
   final prefs = await SharedPreferences.getInstance();
@@ -93,7 +103,7 @@ Future<void> initializeAppSettings(WidgetRef ref) async {
       current.updateCheckEnabled != settings.updateCheckEnabled ||
       current.botSpeed != settings.botSpeed ||
       current.themeMode != settings.themeMode) {
-    ref.read(appSettingsProvider.notifier).state = settings;
+    ref.read(appSettingsProvider.notifier).update(settings);
   }
 }
 
@@ -108,6 +118,6 @@ Future<void> saveAppSettings(AppSettings settings) async {
 
 Future<void> resetAppSettings(dynamic ref) async {
   final defaults = AppSettings.defaults();
-  ref.read(appSettingsProvider.notifier).state = defaults;
+  ref.read(appSettingsProvider.notifier).update(defaults);
   await saveAppSettings(defaults);
 }
