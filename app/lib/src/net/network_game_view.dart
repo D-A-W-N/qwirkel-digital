@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
@@ -287,10 +288,12 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     try {
       previewBoard.scorePlacement(candidatePlacements);
     } on InvalidMoveException catch (e) {
+      HapticFeedback.mediumImpact();
       setState(() => _liveError = e.message);
       return;
     }
 
+    HapticFeedback.selectionClick();
     setState(() {
       _pendingPlacements[position] = widget.ownHand[handIndex];
       _handIndexByPosition[position] = handIndex;

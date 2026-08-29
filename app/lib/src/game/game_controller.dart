@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:qwirkle_core/qwirkle_core.dart';
 
 /// UI-Zustand rund um eine [QwirkleGame]-Partie: hält den noch nicht
@@ -80,10 +81,12 @@ class GameController extends ChangeNotifier {
       // stillschweigend zu scheitern (Nutzer-Feedback: "konnte keinen
       // anderen Stein platzieren, scheint mir ein Bug").
       lastError = _humanReadableMessage(e.reason, e.message);
+      HapticFeedback.mediumImpact();
       notifyListeners();
       return;
     }
 
+    HapticFeedback.selectionClick();
     notifyListeners();
   }
 

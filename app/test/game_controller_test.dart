@@ -3,6 +3,12 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_digital/src/game/game_controller.dart';
 
 void main() {
+  // `stageTile` löst seit Kurzem `HapticFeedback` aus, das einen
+  // initialisierten Flutter-Binding-Kontext braucht (auch außerhalb von
+  // `testWidgets`) - ohne diese Zeile bricht jeder plain `test()` hier mit
+  // "Binding has not yet been initialized" ab.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('stageTile blockiert Zugpositionen, die eine Lücke in der Kette erzeugen', () {
     final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
     final controller = GameController(game);
