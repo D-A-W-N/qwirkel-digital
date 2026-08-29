@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../game/game_screen.dart';
 import '../net/my_rooms_screen.dart';
 import '../net/network_lobby_screen.dart';
 import '../onboarding/rules_screen.dart';
+import '../profile/player_profile.dart';
 import '../settings/app_settings.dart';
 import '../update/update_controller.dart';
 import '../update/update_dialog.dart';
@@ -40,6 +43,20 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
       (i) => TextEditingController(text: 'Spieler ${i + 1}'),
     );
     _botDifficulties = List.generate(maxPlayers, (_) => null);
+    // Deckt den häufigen Fall ab, dass das Profil (siehe player_profile.dart)
+    // bereits geladen ist, wenn dieser Screen (wieder-)betreten wird - z. B.
+    // nach einer Partie zurück zum Setup. Der Kaltstart-Fall (Profil lädt
+    // noch asynchron nach) wird zusätzlich über `ref.listen` in `build()`
+    // abgedeckt.
+    final savedName = ref.read(playerProfileProvider).displayName;
+    if (savedName.isNotEmpty) _nameControllers[0].text = savedName;
+  }
+
+  void _onPlayerOneNameChanged(String value) {
+    ref
+        .read(playerProfileProvider.notifier)
+        .update(PlayerProfile(displayName: value));
+    unawaited(savePlayerProfile(PlayerProfile(displayName: value)));
   }
 
   /// Cleans up a stale post-update backup (proof this process is a
@@ -310,6 +327,17 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
         maybeShowUpdateDialog(context, ref, manual: false);
       }
     });
+    // Fängt den Kaltstart-Fall ab, in dem das Profil erst NACH dem
+    // `initState` dieses Screens asynchron geladen wird (siehe dortiger
+    // Kommentar) - überschreibt das Feld nur, solange es noch den
+    // unveränderten Platzhalter zeigt, damit ein bereits von der Person
+    // eingetippter Name nicht verloren geht.
+    ref.listen<PlayerProfile>(playerProfileProvider, (previous, next) {
+      if (next.displayName.isNotEmpty &&
+          _nameControllers[0].text == 'Spieler 1') {
+        _nameControllers[0].text = next.displayName;
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Qwirkle · Spielmodus')),
@@ -471,6 +499,9 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                 flex: 3,
                                 child: TextField(
                                   controller: _nameControllers[i],
+                                  onChanged: i == 0
+                                      ? _onPlayerOneNameChanged
+                                      : null,
                                   decoration: InputDecoration(
                                     labelText: 'Name Spieler ${i + 1}',
                                     border: const OutlineInputBorder(),
