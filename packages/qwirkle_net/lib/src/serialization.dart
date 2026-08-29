@@ -160,6 +160,18 @@ class GameStateSnapshot {
   final int yourPlayerIndex;
   final LastMoveInfo? lastMove;
 
+  /// Nur `qwirkle_server`-Backend (Internet-Räume): Index der Person mit
+  /// Owner-Rechten (Start/Restart), `null` für Partien ohne Owner-Konzept
+  /// (LAN-`HostSession`).
+  final int? ownerPlayerIndex;
+
+  /// Nur `qwirkle_server`-Backend: ob [ownerPlayerIndex] gerade lange genug
+  /// getrennt ist, dass eine andere Person die Owner-Rolle per
+  /// [ClaimHostMessage] übernehmen darf (siehe
+  /// `RoomSession.hostClaimGracePeriod`) - vom Server vorab geprüft, damit
+  /// die UI den "Host-Rolle übernehmen"-Button gezielt einblenden kann.
+  final bool hostClaimable;
+
   const GameStateSnapshot({
     required this.players,
     required this.currentPlayerIndex,
@@ -168,6 +180,8 @@ class GameStateSnapshot {
     required this.board,
     required this.yourPlayerIndex,
     this.lastMove,
+    this.ownerPlayerIndex,
+    this.hostClaimable = false,
   });
 
   /// Baut den Snapshot aus [game] auf, wobei nur die Hand von
@@ -184,6 +198,8 @@ class GameStateSnapshot {
     int recipientPlayerIndex, {
     LastMoveInfo? lastMove,
     Set<int> disconnectedPlayerIndexes = const {},
+    int? ownerPlayerIndex,
+    bool hostClaimable = false,
   }) {
     return GameStateSnapshot(
       players: [
@@ -203,6 +219,8 @@ class GameStateSnapshot {
       ],
       yourPlayerIndex: recipientPlayerIndex,
       lastMove: lastMove,
+      ownerPlayerIndex: ownerPlayerIndex,
+      hostClaimable: hostClaimable,
     );
   }
 
@@ -214,6 +232,8 @@ class GameStateSnapshot {
     'board': placementsToJson(board),
     'yourPlayerIndex': yourPlayerIndex,
     if (lastMove != null) 'lastMove': lastMove!.toJson(),
+    if (ownerPlayerIndex != null) 'ownerPlayerIndex': ownerPlayerIndex,
+    if (hostClaimable) 'hostClaimable': hostClaimable,
   };
 
   factory GameStateSnapshot.fromJson(Map<String, dynamic> json) =>
@@ -229,5 +249,7 @@ class GameStateSnapshot {
         lastMove: json['lastMove'] != null
             ? LastMoveInfo.fromJson(json['lastMove'] as Map<String, dynamic>)
             : null,
+        ownerPlayerIndex: json['ownerPlayerIndex'] as int?,
+        hostClaimable: json['hostClaimable'] as bool? ?? false,
       );
 }

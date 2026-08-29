@@ -23,7 +23,19 @@ class GameServer {
         retention: retention ?? const Duration(days: 14),
       ) {
     manager = RoomManager(
-      onRoomChanged: (room) => unawaited(store.save(room)),
+      onRoomChanged: (room) {
+        if (room.isEmpty && !room.isGameStarted) {
+          // Vor Spielstart verlassener/leergelaufener Raum: sofort
+          // entfernen statt auf die stündliche Aufräum-Routine zu warten,
+          // sonst könnte eine unbeteiligte Person den (weiterhin gültigen)
+          // Raum-Code kapern und würde automatisch dessen neue:r Owner:in
+          // (siehe RoomSession.handleJoin: `isOwner: seats.isEmpty`).
+          manager.removeRoom(room.roomCode);
+          unawaited(store.delete(room.roomCode));
+        } else {
+          unawaited(store.save(room));
+        }
+      },
     );
   }
 

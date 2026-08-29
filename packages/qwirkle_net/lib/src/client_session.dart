@@ -146,6 +146,12 @@ class ClientSession {
       _lobbyController.add(message);
     } else if (message is GameStateMessage) {
       _latestSnapshot = message.snapshot;
+      final ownerIndex = message.snapshot.ownerPlayerIndex;
+      if (ownerIndex != null) {
+        // Owner-Status kann sich nach dem initialen WelcomeMessage noch
+        // ändern (siehe ClaimHostMessage bei dauerhaftem Host-Ausfall).
+        isRoomOwner = ownerIndex == message.snapshot.yourPlayerIndex;
+      }
       _statusController.add('Spielstand aktualisiert');
       _stateController.add(message.snapshot);
     } else if (message is ErrorMessage) {
@@ -177,6 +183,14 @@ class ClientSession {
   /// lokal über `HostSession.restartGame()`).
   void sendRestartGame() {
     _transport!.send(RestartGameMessage().encode());
+  }
+
+  /// Nur `qwirkle_server`-Backend: fordert die Owner-Rolle an, weil die
+  /// aktuelle Raumersteller-Person seit Langem getrennt ist (siehe
+  /// `RoomSession.hostClaimGracePeriod`). Bei verfrühter Anfrage antwortet
+  /// der Server mit einer [ErrorMessage] statt die Rolle zu übertragen.
+  void sendClaimHost() {
+    _transport!.send(ClaimHostMessage().encode());
   }
 
   Future<void> close() async {

@@ -26,6 +26,13 @@ class RoomSeat {
   MessageTransport? transport;
   StreamSubscription<String>? subscription;
 
+  /// Seit wann dieser Sitzplatz ununterbrochen getrennt ist (`null`, solange
+  /// verbunden) - Grundlage für [RoomSession.hostClaimGracePeriod]. Bewusst
+  /// nicht einfach aus [connected] abgeleitet, damit auch über einen
+  /// Server-Neustart hinweg (siehe `room_persistence.dart`) weitergezählt
+  /// werden kann, statt die Frist bei jedem Redeploy neu zu starten.
+  DateTime? disconnectedSince;
+
   RoomSeat({
     required this.playerId,
     required this.reconnectToken,
@@ -33,6 +40,7 @@ class RoomSeat {
     required this.isOwner,
     this.playerIndex,
     this.connected = true,
+    this.disconnectedSince,
   });
 
   void send(NetMessage message) => transport?.send(message.encode());
@@ -80,6 +88,17 @@ class RoomSession {
 
   final Random _random = Random.secure();
   int _nextPlayerNumber;
+
+  /// Wie lange die Owner-Person ununterbrochen getrennt sein muss, bevor
+  /// eine andere verbundene Person die Owner-Rolle per [ClaimHostMessage]
+  /// übernehmen darf.
+  ///
+  /// Bewusst lang statt eines kurzen Timeouts: Partien können sich über
+  /// mehrere Tage ziehen, in denen es völlig normal ist, dass Host wie
+  /// Mitspieler:innen zwischenzeitlich offline sind (Nutzer-Feedback) - ein
+  /// kurzer Timeout würde solche normalen Pausen fälschlich als
+  /// Raum-Verlassen behandeln.
+  static const hostClaimGracePeriod = Duration(hours: 48);
 
   /// [initialGame] erlaubt es `room_persistence.dart`, eine zuvor
   /// gespeicherte Partie direkt beim Wiederaufbau des Raums (z. B. nach
@@ -147,6 +166,7 @@ class RoomSession {
     if (existingSeat != null) {
       seat = existingSeat;
       seat.connected = true;
+      seat.disconnectedSince = null;
       seat.name = message.name;
     } else {
       seat = RoomSeat(
@@ -199,6 +219,8 @@ class RoomSession {
       } else if (message is RestartGameMessage) {
         _requireOwner(seat);
         _restartGame();
+      } else if (message is ClaimHostMessage) {
+        _claimHost(seat);
       } else {
         final game = _game;
         if (game == null || seat.playerIndex == null) return;
@@ -254,6 +276,38 @@ class RoomSession {
     }
   }
 
+  RoomSeat? get _currentOwner {
+    for (final s in seats) {
+      if (s.isOwner) return s;
+    }
+    return null;
+  }
+
+  bool _isHostClaimable(RoomSeat owner) {
+    final disconnectedSince = owner.disconnectedSince;
+    return disconnectedSince != null &&
+        DateTime.now().difference(disconnectedSince) >= hostClaimGracePeriod;
+  }
+
+  /// Übergibt die Owner-Rolle an [seat], sofern der/die aktuelle
+  /// Raumersteller:in seit mindestens [hostClaimGracePeriod] ununterbrochen
+  /// getrennt ist. Verwaist der Raum ganz ohne Owner (sollte praktisch nicht
+  /// vorkommen), übernimmt [seat] sofort ohne Wartezeit.
+  void _claimHost(RoomSeat seat) {
+    if (seat.isOwner) return;
+    final owner = _currentOwner;
+    if (owner != null && !_isHostClaimable(owner)) {
+      throw StateError(
+        'Die Owner-Rolle kann erst übernommen werden, wenn die aktuelle '
+        'Raumersteller-Person seit mindestens '
+        '${hostClaimGracePeriod.inHours} Stunden ununterbrochen getrennt ist.',
+      );
+    }
+    owner?.isOwner = false;
+    seat.isOwner = true;
+    _broadcastState();
+  }
+
   void _requireCurrentPlayer(RoomSeat seat) {
     if (_game!.currentPlayerIndex != seat.playerIndex) {
       throw StateError('Du bist gerade nicht am Zug.');
@@ -306,6 +360,8 @@ class RoomSession {
     final game = _game;
     if (game == null) return;
     final disconnected = _disconnectedPlayerIndexes;
+    final owner = _currentOwner;
+    final hostClaimable = owner != null && _isHostClaimable(owner);
     for (final s in seats) {
       final index = s.playerIndex;
       if (index == null) continue;
@@ -316,6 +372,8 @@ class RoomSession {
             index,
             lastMove: _lastMove,
             disconnectedPlayerIndexes: disconnected,
+            ownerPlayerIndex: owner?.playerIndex,
+            hostClaimable: hostClaimable,
           ),
         ),
       );
@@ -336,6 +394,7 @@ class RoomSession {
       _broadcastLobby();
     } else {
       seat.connected = false;
+      seat.disconnectedSince = DateTime.now();
       // Bewusst KEIN automatisches Überspringen des Zugs (Unterschied zu
       // HostSession): Die Partie wartet, bis der Sitzplatz per
       // Reconnect-Token zurückerobert wird.

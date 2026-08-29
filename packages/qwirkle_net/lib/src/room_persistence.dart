@@ -23,6 +23,8 @@ Map<String, dynamic> _seatToJson(RoomSeat seat) => {
   'name': seat.name,
   'isOwner': seat.isOwner,
   if (seat.playerIndex != null) 'playerIndex': seat.playerIndex,
+  if (seat.disconnectedSince != null)
+    'disconnectedSince': seat.disconnectedSince!.toIso8601String(),
 };
 
 Map<String, dynamic> _gameToJson(QwirkleGame game) => {
@@ -93,6 +95,13 @@ RoomSession roomSessionFromJson(
         isOwner: seatJson['isOwner'] as bool,
         playerIndex: seatJson['playerIndex'] as int?,
         connected: false,
+        // War der Sitzplatz beim Speichern bereits getrennt, zählt die
+        // Kulanzfrist (siehe `RoomSession.hostClaimGracePeriod`) über den
+        // Neustart hinweg weiter. War er verbunden, gilt der Neustart selbst
+        // als der Moment der Trennung - kein Transport überlebt ihn.
+        disconnectedSince: seatJson['disconnectedSince'] != null
+            ? DateTime.parse(seatJson['disconnectedSince'] as String)
+            : DateTime.now(),
       ),
     );
   }
