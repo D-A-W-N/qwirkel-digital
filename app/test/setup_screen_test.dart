@@ -75,6 +75,28 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Einstellungen-Sheet zeigt einen Design-Umschalter mit System/Hell/Dunkel',
+    (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SetupScreen())),
+      );
+
+      await tester.tap(find.text('Einstellungen'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Design'), findsOneWidget);
+      final segmentedButton = tester.widget<SegmentedButton<ThemeMode>>(
+        find.byType(SegmentedButton<ThemeMode>),
+      );
+      expect(
+        segmentedButton.segments.map((s) => s.value),
+        containsAll(ThemeMode.values),
+      );
+      expect(segmentedButton.selected, {ThemeMode.system});
+    },
+  );
+
   test('App-Settings speichern Animations- und Tipps-Status', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -83,6 +105,7 @@ void main() {
     expect(container.read(appSettingsProvider).tipsEnabled, isTrue);
     expect(container.read(appSettingsProvider).updateCheckEnabled, isTrue);
     expect(container.read(appSettingsProvider).botSpeed, BotSpeed.normal);
+    expect(container.read(appSettingsProvider).themeMode, ThemeMode.system);
 
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
@@ -96,12 +119,16 @@ void main() {
     container.read(appSettingsProvider.notifier).state = container
         .read(appSettingsProvider)
         .copyWith(botSpeed: BotSpeed.fast);
+    container.read(appSettingsProvider.notifier).state = container
+        .read(appSettingsProvider)
+        .copyWith(themeMode: ThemeMode.dark);
 
     final settings = container.read(appSettingsProvider);
     expect(settings.animationsEnabled, isFalse);
     expect(settings.tipsEnabled, isFalse);
     expect(settings.updateCheckEnabled, isFalse);
     expect(settings.botSpeed, BotSpeed.fast);
+    expect(settings.themeMode, ThemeMode.dark);
   });
 
   test('App-Settings können auf Standardwerte zurückgesetzt werden', () async {
@@ -115,6 +142,7 @@ void main() {
           tipsEnabled: false,
           updateCheckEnabled: false,
           botSpeed: BotSpeed.slow,
+          themeMode: ThemeMode.dark,
         );
 
     try {
@@ -127,6 +155,7 @@ void main() {
       expect(settings.tipsEnabled, isTrue);
       expect(settings.updateCheckEnabled, isTrue);
       expect(settings.botSpeed, BotSpeed.normal);
+      expect(settings.themeMode, ThemeMode.system);
       return;
     }
 
@@ -135,5 +164,6 @@ void main() {
     expect(settings.tipsEnabled, isTrue);
     expect(settings.updateCheckEnabled, isTrue);
     expect(settings.botSpeed, BotSpeed.normal);
+    expect(settings.themeMode, ThemeMode.system);
   });
 }
