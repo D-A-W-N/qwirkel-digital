@@ -6,6 +6,7 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../common/human_readable_error.dart';
+import 'lobby_widgets.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
 
@@ -410,9 +411,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              if (_lobbyPlayers.isEmpty)
-                const Text('Noch keine Teilnehmer')
-              else ...[
+              if (_lobbyPlayers.isNotEmpty) ...[
                 Text(
                   isHosting
                       ? (_gameStarted || _snapshot != null
@@ -424,38 +423,18 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
-                ..._lobbyPlayers.map(
-                  (player) => ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Text(player.name),
-                    trailing: _snapshot != null || _gameStarted
-                        ? Icon(
-                            Icons.play_circle_fill,
-                            color: Colors.green.shade700,
-                          )
-                        : Icon(Icons.pending, color: Colors.orange.shade700),
-                  ),
-                ),
               ],
+              LobbyPlayerList(
+                players: _lobbyPlayers,
+                allReady: _snapshot != null || _gameStarted,
+              ),
             ],
             const Spacer(),
-            if (_hasOwnerControls && !_gameStarted) ...[
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _startGame,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Spiel starten'),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Zurück zur Lobby'),
-              ),
+            LobbyActionButtons(
+              hasOwnerControls: _hasOwnerControls,
+              gameStarted: _gameStarted,
+              onStartGame: _startGame,
+              onBack: () => Navigator.of(context).pop(),
             ),
           ],
         ),
