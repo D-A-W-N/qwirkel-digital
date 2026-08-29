@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:qwirkle_core/qwirkle_core.dart';
 
+import '../common/human_readable_error.dart';
+
 /// UI-Zustand rund um eine [QwirkleGame]-Partie: hält den noch nicht
 /// bestätigten Zug (pending placements) und die Tausch-Auswahl, bevor sie
 /// an die Spiel-Engine übergeben werden.
@@ -166,7 +168,7 @@ class GameController extends ChangeNotifier {
       lastBotPlacements = {};
       lastBotSummary = null;
     } on Object catch (e) {
-      lastError = e.toString();
+      lastError = humanReadableError(e);
     }
     selectedForExchange.clear();
     notifyListeners();

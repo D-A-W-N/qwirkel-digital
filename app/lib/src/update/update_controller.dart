@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../common/human_readable_error.dart';
 import 'github_release_client.dart';
 import 'update_applier.dart';
 import 'update_applier_android.dart';
@@ -111,7 +112,7 @@ class UpdateController extends Notifier<UpdateState> {
         releaseUrl: release.htmlUrl,
       );
     } catch (e) {
-      state = state.copyWith(phase: UpdatePhase.error, errorMessage: e.toString());
+      state = state.copyWith(phase: UpdatePhase.error, errorMessage: humanReadableError(e));
     }
   }
 
@@ -133,7 +134,7 @@ class UpdateController extends Notifier<UpdateState> {
       );
       state = state.copyWith(phase: UpdatePhase.readyToRelaunch, downloadProgress: 1);
     } catch (e) {
-      state = state.copyWith(phase: UpdatePhase.error, errorMessage: e.toString());
+      state = state.copyWith(phase: UpdatePhase.error, errorMessage: humanReadableError(e));
     }
   }
 
@@ -145,7 +146,7 @@ class UpdateController extends Notifier<UpdateState> {
     try {
       await ref.read(updateApplierProvider).confirmApply();
     } catch (e) {
-      state = state.copyWith(phase: UpdatePhase.error, errorMessage: e.toString());
+      state = state.copyWith(phase: UpdatePhase.error, errorMessage: humanReadableError(e));
     }
   }
 

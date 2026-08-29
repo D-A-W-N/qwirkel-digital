@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
+import '../common/human_readable_error.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
 
@@ -68,7 +69,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _status = 'Fehler: $error';
+        _status = 'Fehler: ${humanReadableError(error)}';
       });
     } finally {
       if (mounted) {
