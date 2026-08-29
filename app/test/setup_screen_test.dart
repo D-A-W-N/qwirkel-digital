@@ -6,6 +6,26 @@ import 'package:qwirkle_digital/src/settings/app_settings.dart';
 
 void main() {
   testWidgets(
+    'Die Spieleranzahl-Buttons haben Tooltips für Screenreader-Nutzer:innen',
+    (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SetupScreen())),
+      );
+
+      final decrement = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.remove_circle_outline),
+      );
+      final increment = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.add_circle_outline),
+      );
+      expect(decrement.tooltip, isNotNull);
+      expect(decrement.tooltip, isNotEmpty);
+      expect(increment.tooltip, isNotNull);
+      expect(increment.tooltip, isNotEmpty);
+    },
+  );
+
+  testWidgets(
     'SetupScreen öffnet die Regeln-&-Hilfe-Seite mit Spielziel und Hausregeln',
     (tester) async {
       await tester.pumpWidget(
