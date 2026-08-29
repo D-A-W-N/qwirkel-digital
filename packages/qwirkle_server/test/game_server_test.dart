@@ -39,9 +39,9 @@ void main() {
       await server.start(address: '127.0.0.1', port: 0);
       addTearDown(server.close);
 
-      final response = await HttpClient().getUrl(
-        Uri.parse('http://127.0.0.1:${server.port}/health'),
-      ).then((r) => r.close());
+      final response = await HttpClient()
+          .getUrl(Uri.parse('http://127.0.0.1:${server.port}/health'))
+          .then((r) => r.close());
 
       expect(response.statusCode, 200);
     });
@@ -53,7 +53,11 @@ void main() {
 
       final anna = await _connect(server.port, name: 'Anna');
       addTearDown(anna.close);
-      final ben = await _connect(server.port, name: 'Ben', roomCode: anna.roomCode);
+      final ben = await _connect(
+        server.port,
+        name: 'Ben',
+        roomCode: anna.roomCode,
+      );
       addTearDown(ben.close);
 
       final annaState = anna.stateUpdates.first;
@@ -105,6 +109,39 @@ void main() {
 
         final error = await errorFuture;
         expect(error, contains('Unbekannter'));
+      },
+    );
+
+    test(
+      'Zu viele Verbindungsversuche von einer IP werden mit 429 abgelehnt',
+      () async {
+        final server = GameServer(
+          dataDir: dataDir,
+          rateLimiter: ConnectionRateLimiter(
+            maxAttempts: 2,
+            window: const Duration(seconds: 10),
+          ),
+        );
+        await server.start(address: '127.0.0.1', port: 0);
+        addTearDown(server.close);
+
+        final anna = await _connect(server.port, name: 'Anna');
+        addTearDown(anna.close);
+        final ben = await _connect(
+          server.port,
+          name: 'Ben',
+          roomCode: anna.roomCode,
+        );
+        addTearDown(ben.close);
+
+        // Der dritte Verbindungsversuch von derselben (Loopback-)IP
+        // innerhalb des Fensters überschreitet das Limit - der Server lehnt
+        // das WebSocket-Upgrade bereits per HTTP 429 ab, statt den Beitritt
+        // überhaupt an RoomManager weiterzureichen.
+        await expectLater(
+          WebSocket.connect('ws://127.0.0.1:${server.port}'),
+          throwsA(isA<WebSocketException>()),
+        );
       },
     );
 

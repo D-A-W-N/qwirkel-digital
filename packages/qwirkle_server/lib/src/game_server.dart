@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:qwirkle_net/qwirkle_net.dart';
 
+import 'connection_rate_limiter.dart';
 import 'room_store.dart';
 
 /// Der eigentliche Internet-Multiplayer-Server: HTTP/WebSocket-Aufbau
@@ -13,15 +14,20 @@ import 'room_store.dart';
 /// echten Netzwerk-/Dateisystem-Ressourcen.
 class GameServer {
   final RoomStore store;
+  final ConnectionRateLimiter rateLimiter;
   late final RoomManager manager;
   HttpServer? _http;
   Timer? _cleanupTimer;
 
-  GameServer({required Directory dataDir, Duration? retention})
-    : store = RoomStore(
-        dataDir: dataDir,
-        retention: retention ?? const Duration(days: 14),
-      ) {
+  GameServer({
+    required Directory dataDir,
+    Duration? retention,
+    ConnectionRateLimiter? rateLimiter,
+  }) : store = RoomStore(
+         dataDir: dataDir,
+         retention: retention ?? const Duration(days: 14),
+       ),
+       rateLimiter = rateLimiter ?? ConnectionRateLimiter() {
     manager = RoomManager(
       onRoomChanged: (room) {
         if (room.isEmpty && !room.isGameStarted) {
@@ -51,6 +57,13 @@ class GameServer {
     _http = server;
     server.listen((request) async {
       if (WebSocketTransformer.isUpgradeRequest(request)) {
+        if (!rateLimiter.allow(clientIpOf(request))) {
+          request.response
+            ..statusCode = HttpStatus.tooManyRequests
+            ..write('Zu viele Verbindungsversuche. Bitte kurz warten.')
+            ..close();
+          return;
+        }
         final socket = await WebSocketTransformer.upgrade(request);
         manager.acceptTransport(WebSocketTransport(socket));
       } else if (request.uri.path == '/health') {
