@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.9.20] - 2026-08-29
+
+- Bots now generate "bridging" moves - placing tiles on both sides of an already-occupied tile within the same line - which they previously never considered even though the rules already allowed it; this was likely the biggest reason bots looked weak even on "Hard". "Hard" also replaces its old flat penalty for open 5-tile lines with a proportional 1-ply estimate of what an opponent could score from any line a move leaves open
+- Fixed a bug where leaving an internet room's lobby before the game started left the (now empty) room behind on the server - the next person to reuse that room code would silently become its new owner. Empty pre-game rooms are now deleted immediately instead of waiting for the 14-day cleanup sweep
+- Added a way to recover a game if its host disconnects for good mid-game (previously nobody could ever start/restart again): after 48 hours of continuous disconnection, another connected player can claim host rights. No short timeout, since games can span multiple days and being offline for a while is completely normal
+- Internet rooms now stay connected when you navigate away from them - browsing other rooms, or the app, no longer drops your seat. A new "Meine Räume" screen lists every room you're connected to or have previously joined, you can be in several games at once, and you get a notification if it becomes your turn in a room that isn't the one you're currently looking at. Leaving a room for good is now a separate, explicit "Raum verlassen" action
+- Added a first-launch onboarding intro (welcome, features, house rules) and a permanent "Regeln & Hilfe" screen that replaces the old one-shot "Anleitung" dialog, listing all of this app's deliberate deviations from official Qwirkle rules in one place
+
 ## [0.9.19] - 2026-08-08
 
 - Android now supports in-app updates: the app checks GitHub Releases, downloads and verifies the new APK, then hands it to the system package installer for confirmation (a running app can't silently replace its own installed package on Android, unlike the desktop builds - installation still requires a final tap in the system dialog)
