@@ -140,6 +140,24 @@ class RestartGameMessage extends NetMessage {
       RestartGameMessage();
 }
 
+/// Client -> Server: Wunsch, die Owner-Rolle zu übernehmen, weil der/die
+/// aktuelle Raumersteller:in seit Langem getrennt ist (`qwirkle_server`-
+/// Backend; siehe `RoomSession.hostClaimGracePeriod`). Der Server prüft die
+/// Berechtigung selbst anhand von [RoomSeat.disconnectedSince] - eine
+/// verfrühte Anfrage wird per [ErrorMessage] abgelehnt.
+class ClaimHostMessage extends NetMessage {
+  ClaimHostMessage();
+
+  @override
+  String get type => 'claimHost';
+
+  @override
+  Map<String, dynamic> toJson() => {};
+
+  factory ClaimHostMessage.fromJson(Map<String, dynamic> json) =>
+      ClaimHostMessage();
+}
+
 /// Host -> alle Clients: aktuelle Warteliste vor Spielstart.
 class LobbyMessage extends NetMessage {
   final List<({String id, String name})> players;
@@ -267,6 +285,8 @@ NetMessage decodeMessage(String line) {
       return StartGameMessage.fromJson(json);
     case 'restartGame':
       return RestartGameMessage.fromJson(json);
+    case 'claimHost':
+      return ClaimHostMessage.fromJson(json);
     case 'error':
       return ErrorMessage.fromJson(json);
     default:

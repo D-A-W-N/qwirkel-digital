@@ -317,6 +317,73 @@ void main() {
       },
     );
 
+    test(
+      'ClaimHostMessage wird abgelehnt, solange die Kulanzfrist nicht '
+      'abgelaufen ist',
+      () async {
+        // Absichtlich kein kurzer Timeout: Partien können sich über
+        // mehrere Tage ziehen, in denen Offline-Sein normal ist.
+        final anna = await _connect(port, name: 'Anna');
+        final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+        addTearDown(ben.close);
+
+        final annaState = anna.stateUpdates.first;
+        final benState = ben.stateUpdates.first;
+        anna.sendStartGame();
+        await annaState;
+        await benState;
+
+        final benSeesDisconnect = ben.stateUpdates.firstWhere(
+          (s) => !s.players[0].connected,
+        );
+        await anna.close();
+        await benSeesDisconnect;
+
+        final errorFuture = ben.errors.first;
+        ben.sendClaimHost();
+        final error = await errorFuture;
+
+        expect(error, contains('Stunden'));
+        final room = server.manager.room(ben.roomCode!)!;
+        expect(room.seats.where((s) => s.isOwner).single.name, 'Anna');
+      },
+    );
+
+    test(
+      'ClaimHostMessage überträgt die Owner-Rolle, wenn die Kulanzfrist '
+      'bereits abgelaufen ist',
+      () async {
+        final anna = await _connect(port, name: 'Anna');
+        final ben = await _connect(port, name: 'Ben', roomCode: anna.roomCode);
+        addTearDown(ben.close);
+
+        final annaState = anna.stateUpdates.first;
+        final benState = ben.stateUpdates.first;
+        anna.sendStartGame();
+        await annaState;
+        await benState;
+
+        final benSeesDisconnect = ben.stateUpdates.firstWhere(
+          (s) => !s.players[0].connected,
+        );
+        await anna.close();
+        await benSeesDisconnect;
+
+        final room = server.manager.room(ben.roomCode!)!;
+        room.seats.firstWhere((s) => s.isOwner).disconnectedSince =
+            DateTime.now().subtract(const Duration(hours: 49));
+
+        final benBecomesOwner = ben.stateUpdates.firstWhere(
+          (s) => s.ownerPlayerIndex == s.yourPlayerIndex,
+        );
+        ben.sendClaimHost();
+        await benBecomesOwner;
+
+        expect(ben.isRoomOwner, isTrue);
+        expect(room.seats.where((s) => s.isOwner).single.name, 'Ben');
+      },
+    );
+
     test('Ein Reconnect wird auch den anderen Sitzplätzen live mitgeteilt, '
         'nicht nur dem zurückkehrenden', () async {
       // Regression: vorher wurde nach einem erfolgreichen Reconnect der
