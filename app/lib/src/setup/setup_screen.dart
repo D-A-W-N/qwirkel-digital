@@ -7,6 +7,7 @@ import '../game/game_controller.dart';
 import '../game/game_providers.dart';
 import '../game/game_screen.dart';
 import '../net/network_lobby_screen.dart';
+import '../onboarding/rules_screen.dart';
 import '../settings/app_settings.dart';
 import '../update/update_controller.dart';
 import '../update/update_dialog.dart';
@@ -94,46 +95,6 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
           ],
           child: const GameScreen(),
         ),
-      ),
-    );
-  }
-
-  void _showHowToPlayDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Spielziel'),
-        content: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Bilde Reihen aus Farben oder Formen.'),
-              SizedBox(height: 8),
-              Text(
-                'Jeder Zug bringt Punkte, wenn die Reihen logisch aufgebaut sind.',
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Wenn du unsicher bist, probiere zuerst einfache Reihen mit gleichen Farben oder Formen.',
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Hausregel: Innerhalb eines Zugs dürfen deine neuen Steine auch die Richtung wechseln (z. B. eine T- oder L-Form bilden) – sie müssen dabei aber lückenlos zusammenhängen.',
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Hausregel: Bei mehreren Steinen in einem Zug zählt jeder Stein einzeln nach der Länge seiner Reihe zum Zeitpunkt seines Anlegens (z. B. bringen 3 Steine, die eine Reihe verlängern, 1+2+3 statt nur der fertigen Reihenlänge).',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Verstanden'),
-          ),
-        ],
       ),
     );
   }
@@ -340,9 +301,13 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                         children: [
                           Expanded(
                             child: FilledButton.tonalIcon(
-                              onPressed: () => _showHowToPlayDialog(context),
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const RulesScreen(),
+                                ),
+                              ),
                               icon: const Icon(Icons.help_outline),
-                              label: const Text('Anleitung'),
+                              label: const Text('Regeln & Hilfe'),
                             ),
                           ),
                           const SizedBox(width: 8),
