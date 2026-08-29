@@ -116,6 +116,18 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   bool _exchangeMode = false;
   final Set<int> _selectedForExchange = {};
 
+  /// Tap-to-Place-Alternative zu Drag&Drop - spiegelt
+  /// `GameController.selectedHandIndex` im lokalen Spiel.
+  int? _selectedHandIndex;
+
+  /// Siehe `GameController.selectHandTile`.
+  void _selectHandTile(int? index) {
+    if (index != null && _handIndexByPosition.containsValue(index)) return;
+    setState(() {
+      _selectedHandIndex = _selectedHandIndex == index ? null : index;
+    });
+  }
+
   /// Eigener Messenger statt `ScaffoldMessenger.of(context)`: `context`
   /// dieses States liegt OBERHALB des eigenen `Scaffold`s (das erst in
   /// `build()` entsteht), sodass `.of(context)` aus `didUpdateWidget`
@@ -224,6 +236,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         _exchangeMode = false;
         _selectedForExchange.clear();
       }
+      _selectedHandIndex = null;
     }
     if (restarted) {
       _liveError = null;
@@ -328,6 +341,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       _pendingPlacements[position] = widget.ownHand[handIndex];
       _handIndexByPosition[position] = handIndex;
       _liveError = null;
+      _selectedHandIndex = null;
     });
   }
 
@@ -579,6 +593,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     _pendingPlacements.clear();
                     _handIndexByPosition.clear();
                     _liveError = null;
+                    _selectedHandIndex = null;
                   })
                 : null,
             child: const Text('Zurücknehmen'),
@@ -607,6 +622,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
               ? () => setState(() {
                   _exchangeMode = !_exchangeMode;
                   _selectedForExchange.clear();
+                  _selectedHandIndex = null;
                 })
               : null,
           child: Text(_exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
@@ -698,6 +714,13 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                       cellSize: _cellSize,
                       tileSize: _tileSize,
                       highlightedPositions: lastMovePositions,
+                      hasSelection: _selectedHandIndex != null,
+                      onTapEmptyCell: (position) {
+                        final index = _selectedHandIndex;
+                        if (index != null) {
+                          _stageTile(board, index, position);
+                        }
+                      },
                     ),
                     if (pendingScore != null)
                       Positioned(
@@ -861,6 +884,8 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                         exchangeMode: _exchangeMode,
                         selectedForExchange: _selectedForExchange,
                         onToggleExchange: _toggleExchangeSelection,
+                        selectedHandIndex: _selectedHandIndex,
+                        onSelectHandTile: _selectHandTile,
                       ),
                       const SizedBox(height: 6),
                       _buildActionButtons(isMyTurn),

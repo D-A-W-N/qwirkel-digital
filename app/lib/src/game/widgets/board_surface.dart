@@ -21,6 +21,8 @@ class BoardSurface extends StatelessWidget {
     required this.cellSize,
     required this.tileSize,
     this.highlightedPositions = const {},
+    this.hasSelection = false,
+    this.onTapEmptyCell,
   });
 
   final Map<Position, Tile> board;
@@ -30,6 +32,14 @@ class BoardSurface extends StatelessWidget {
   final void Function(Position position) onUnstage;
   final double cellSize;
   final double tileSize;
+
+  /// Tap-to-Place-Alternative zu Drag&Drop: ob gerade ein Hand-Stein zur
+  /// Platzierung ausgewählt ist (steuert, ob leere Felder als "hier
+  /// platzierbar" markiert werden und ob [onTapEmptyCell] überhaupt
+  /// reagiert) - `false`/`null` (Standard) lässt das Verhalten unverändert
+  /// reines Drag&Drop.
+  final bool hasSelection;
+  final void Function(Position position)? onTapEmptyCell;
 
   /// Zuletzt platzierte Steine (Bot-Zug lokal, fremder Zug im Netzwerkspiel)
   /// - kurz hervorgehoben, damit sichtbar ist, was gerade passiert ist.
@@ -104,6 +114,8 @@ class BoardSurface extends StatelessWidget {
                   onUnstage: onUnstage,
                   tileSize: tileSize,
                   highlighted: highlightedPositions.contains(position),
+                  hasSelection: hasSelection,
+                  onTapEmptyCell: onTapEmptyCell,
                 ),
               ),
             ),
@@ -124,6 +136,8 @@ class _BoardCell extends StatelessWidget {
     required this.onUnstage,
     required this.tileSize,
     this.highlighted = false,
+    this.hasSelection = false,
+    this.onTapEmptyCell,
   });
 
   final Position position;
@@ -134,6 +148,8 @@ class _BoardCell extends StatelessWidget {
   final void Function(Position position) onUnstage;
   final double tileSize;
   final bool highlighted;
+  final bool hasSelection;
+  final void Function(Position position)? onTapEmptyCell;
 
   @override
   Widget build(BuildContext context) {
@@ -164,22 +180,34 @@ class _BoardCell extends StatelessWidget {
       );
     }
 
+    final tapSelectable = canInteract && hasSelection;
     return DragTarget<int>(
       onWillAcceptWithDetails: (details) => canInteract,
       onAcceptWithDetails: (details) => onDropTile(details.data, position),
       builder: (context, candidateData, rejectedData) {
-        final active = candidateData.isNotEmpty;
+        // Bei aktiver Tap-Auswahl gelten ALLE leeren Felder als
+        // "hier platzierbar" (nicht nur das gerade bedraggte) - wichtig als
+        // Orientierungshilfe für Personen, die per Tippen statt per
+        // Drag&Drop platzieren.
+        final active = candidateData.isNotEmpty || tapSelectable;
         final colorScheme = Theme.of(context).colorScheme;
-        return Container(
-          margin: const EdgeInsets.all(1),
-          decoration: BoxDecoration(
-            color: active
-                ? colorScheme.primary.withValues(alpha: 0.15)
-                : Colors.transparent,
-            border: Border.all(
-              color: active
-                  ? colorScheme.primary.withValues(alpha: 0.6)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
+        return GestureDetector(
+          onTap: tapSelectable ? () => onTapEmptyCell?.call(position) : null,
+          child: Semantics(
+            button: tapSelectable,
+            label: tapSelectable ? 'Hier platzieren' : null,
+            child: Container(
+              margin: const EdgeInsets.all(1),
+              decoration: BoxDecoration(
+                color: active
+                    ? colorScheme.primary.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: active
+                      ? colorScheme.primary.withValues(alpha: 0.6)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
             ),
           ),
         );
