@@ -550,6 +550,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0"
+  qwirkle_server:
+    dependency: "direct dev"
+    description:
+      path: "../packages/qwirkle_server"
+      relative: true
+    source: path
+    version: "1.0.0"
   record_use:
     dependency: transitive
     description:

@@ -6,6 +6,7 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import '../game/game_controller.dart';
 import '../game/game_providers.dart';
 import '../game/game_screen.dart';
+import '../net/my_rooms_screen.dart';
 import '../net/network_lobby_screen.dart';
 import '../settings/app_settings.dart';
 import '../update/update_controller.dart';
@@ -396,13 +397,31 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                 'Hoste ein Spiel oder tritt über LAN/Internet einer Partie bei.',
                               ),
                               const SizedBox(height: 8),
-                              FilledButton.tonal(
-                                onPressed: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const NetworkLobbyScreen(),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.tonal(
+                                      onPressed: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const NetworkLobbyScreen(),
+                                        ),
+                                      ),
+                                      child: const Text('Netzwerk-Setup öffnen'),
+                                    ),
                                   ),
-                                ),
-                                child: const Text('Netzwerk-Setup öffnen'),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const MyRoomsScreen(),
+                                        ),
+                                      ),
+                                      child: const Text('Meine Räume'),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
