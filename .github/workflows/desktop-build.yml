@@ -156,7 +156,14 @@ jobs:
   release:
     name: Publish release assets
     needs: [build, build-android]
-    if: startsWith(github.ref, 'refs/tags/')
+    # `needs` alone would skip this job entirely if even one matrix leg of
+    # `build` (or `build-android`) failed - e.g. one flaky platform runner
+    # would silently withhold the release for every OTHER platform that
+    # built fine too. `always()` overrides that default skip so this job
+    # still runs as long as the tag condition holds and at least one
+    # artifact-producing job actually succeeded; `download-artifact` below
+    # then just picks up whatever artifacts exist.
+    if: always() && startsWith(github.ref, 'refs/tags/') && (needs.build.result == 'success' || needs['build-android'].result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
