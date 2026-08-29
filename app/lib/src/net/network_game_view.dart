@@ -13,20 +13,6 @@ import '../game/widgets/score_panel.dart';
 import '../game/widgets/turn_dialog.dart';
 
 class NetworkGameView extends StatefulWidget {
-  const NetworkGameView({
-    super.key,
-    required this.snapshot,
-    required this.ownHand,
-    required this.canInteract,
-    required this.onSendMove,
-    required this.onSendPass,
-    required this.onSendExchange,
-    required this.isRoomOwner,
-    required this.onRestartGame,
-    this.statusText,
-    this.errorText,
-  });
-
   final GameStateSnapshot snapshot;
   final List<Tile> ownHand;
   final bool canInteract;
@@ -61,6 +47,28 @@ class NetworkGameView extends StatefulWidget {
   /// womöglich von einem nachfolgenden Routine-Update überschrieben zu
   /// werden, bevor sie überhaupt bemerkt wird.
   final String? errorText;
+
+  /// Zeigt einen "Raum verlassen"-Button in der AppBar, wenn gesetzt - nur
+  /// für Internet-Räume relevant (`InternetRoomScreen`), wo Wegnavigieren
+  /// die Verbindung absichtlich nicht mehr trennt und es daher eine
+  /// separate, explizite Aktion braucht, um den Sitzplatz endgültig
+  /// freizugeben. `null` (LAN-Modus) zeigt keinen solchen Button.
+  final VoidCallback? onLeaveRoom;
+
+  const NetworkGameView({
+    super.key,
+    required this.snapshot,
+    required this.ownHand,
+    required this.canInteract,
+    required this.onSendMove,
+    required this.onSendPass,
+    required this.onSendExchange,
+    required this.isRoomOwner,
+    required this.onRestartGame,
+    this.statusText,
+    this.errorText,
+    this.onLeaveRoom,
+  });
 
   @override
   State<NetworkGameView> createState() => _NetworkGameViewState();
@@ -624,6 +632,14 @@ class _NetworkGameViewState extends State<NetworkGameView> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('Qwirkle · ${widget.snapshot.bagRemaining} übrig'),
+          actions: [
+            if (widget.onLeaveRoom != null)
+              IconButton(
+                onPressed: widget.onLeaveRoom,
+                icon: const Icon(Icons.logout),
+                tooltip: 'Raum verlassen',
+              ),
+          ],
         ),
         body: SafeArea(
           child: Column(

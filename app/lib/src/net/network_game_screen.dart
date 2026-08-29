@@ -5,10 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
-import 'internet_room_history.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
 
+/// LAN-Mehrspieler (direkte TCP-Verbindung, kein dedizierter Server) - für
+/// Internet-Räume siehe stattdessen `InternetRoomScreen`, dessen Sessions
+/// vom app-weiten `RoomConnectionManager` gehalten werden, damit sie
+/// Wegnavigieren überleben. Eine LAN-Sitzung ist an einen Prozess/eine
+/// Vor-Ort-Sitzung gebunden - Parallelbetrieb ergibt hier keinen Mehrwert,
+/// daher bleiben Sessions bewusst an diesen Screen gebunden.
 class NetworkGameScreen extends StatefulWidget {
   const NetworkGameScreen({super.key, required this.config});
 
@@ -21,7 +26,6 @@ class NetworkGameScreen extends StatefulWidget {
 class _NetworkGameScreenState extends State<NetworkGameScreen> {
   HostSession? _hostSession;
   ClientSession? _clientSession;
-  String? _inviteCode;
   List<String> _localAddresses = const [];
   String? _status;
   List<({String id, String name})> _lobbyPlayers = const [];
@@ -36,20 +40,9 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   /// würde) - siehe Nutzer-Feedback "Fehler besser visualisieren".
   String? _errorText;
 
-  /// Ob gerade automatisch versucht wird, eine verlorene Internet-
-  /// Verbindung wiederherzustellen (z. B. weil der `qwirkle_server` gerade
-  /// neu deployed wurde) - siehe Nutzer-Feedback: vorher blieb die Partie
-  /// beim Verbindungsverlust ohne jeden weiteren Versuch einfach stehen,
-  /// man musste manuell verlassen und neu beitreten. Blockt währenddessen
-  /// das Senden von Zügen (die sonst ins Leere gingen).
-  bool _reconnecting = false;
-
-  bool get _isLan => widget.config.mode == 'lan';
-
   /// Ob diese Seite die Steuerung zum Starten/Neustarten der Partie zeigen
-  /// soll: im LAN-Modus der eingebettete Host, im Internet-Modus die
-  /// Person, die den Raum erstellt hat (`ClientSession.isRoomOwner`, vom
-  /// Server bestätigt).
+  /// soll: der eingebettete Host, oder (in der Praxis nie der Fall im
+  /// LAN-Modus) ein Client mit Owner-Rechten.
   bool get _hasOwnerControls =>
       _hostSession != null || (_clientSession?.isRoomOwner ?? false);
 
@@ -66,19 +59,11 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       }
 
       if (widget.config.isHosting) {
-        setState(() {
-          _status = _isLan
-              ? 'Host wird gestartet...'
-              : 'Internet-Raum wird erstellt...';
-        });
+        setState(() => _status = 'Host wird gestartet...');
         await _startHosting();
       } else {
-        setState(() {
-          _status = _isLan
-              ? 'Verbinde mit dem Host...'
-              : 'Verbinde über Internet...';
-        });
-        await _joinSession();
+        setState(() => _status = 'Verbinde mit dem Host...');
+        await _joinLan();
       }
     } catch (error) {
       if (!mounted) return;
@@ -93,53 +78,29 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
   }
 
   Future<void> _startHosting() async {
-    if (_isLan) {
-      final host = HostSession(hostPlayerName: widget.config.effectiveName);
-      _wireHostListeners(host);
-      final addresses = await _detectLocalAddresses();
-      if (mounted) {
-        setState(() => _localAddresses = addresses);
-      }
-      await host.start(address: '0.0.0.0', port: widget.config.effectivePort);
-      _hostSession = host;
-      final initialSnapshot = host.snapshotForHost();
-      if (mounted && initialSnapshot != null) {
-        setState(() {
-          _snapshot = initialSnapshot;
-          _ownHand =
-              initialSnapshot.players[initialSnapshot.yourPlayerIndex].hand ??
-              const <Tile>[];
-          _status = 'Host-Zustand aktualisiert';
-        });
-      }
-      if (!mounted) return;
-      setState(() {
-        _status = 'Host läuft auf Port ${host.port}';
-        _lobbyPlayers = host.lobbyPlayers;
-        _gameStarted = false;
-      });
-      return;
+    final host = HostSession(hostPlayerName: widget.config.effectiveName);
+    _wireHostListeners(host);
+    final addresses = await _detectLocalAddresses();
+    if (mounted) {
+      setState(() => _localAddresses = addresses);
     }
-
-    // Internet: kein eigener lokaler Server mehr - der Ersteller ist genau
-    // wie jede:r Mitspieler:in ein Client des dedizierten `qwirkle_server`-
-    // Backends, bekommt vom Server aber die Owner-Rechte (siehe
-    // `ClientSession.isRoomOwner`) für Start/Neustart der Partie.
-    final session = ClientSession();
-    _wireClientListeners(session);
-    final socket = await WebSocket.connect(widget.config.effectiveServerUrl);
-    await session.connectVia(
-      WebSocketTransport(socket),
-      name: widget.config.effectiveName,
-      roomName: widget.config.roomName.isEmpty ? null : widget.config.roomName,
-    );
-    await _rememberSession(session);
-    _afterClientConnected(session);
+    await host.start(address: '0.0.0.0', port: widget.config.effectivePort);
+    _hostSession = host;
+    final initialSnapshot = host.snapshotForHost();
+    if (mounted && initialSnapshot != null) {
+      setState(() {
+        _snapshot = initialSnapshot;
+        _ownHand =
+            initialSnapshot.players[initialSnapshot.yourPlayerIndex].hand ??
+            const <Tile>[];
+        _status = 'Host-Zustand aktualisiert';
+      });
+    }
     if (!mounted) return;
     setState(() {
-      _inviteCode = session.roomCode;
-      _status =
-          'Raum "${session.roomName}" erstellt – Einladungscode: ${session.roomCode}';
+      _status = 'Host läuft auf Port ${host.port}';
+      _lobbyPlayers = host.lobbyPlayers;
+      _gameStarted = false;
     });
   }
 
@@ -198,14 +159,6 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
     }
   }
 
-  Future<void> _joinSession() async {
-    if (_isLan) {
-      await _joinLan();
-    } else {
-      await _joinInternet();
-    }
-  }
-
   Future<void> _joinLan() async {
     final session = ClientSession();
     _wireClientListeners(session);
@@ -215,67 +168,6 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       name: widget.config.effectiveName,
     );
     _afterClientConnected(session);
-  }
-
-  Future<void> _joinInternet() async {
-    final session = ClientSession();
-    _wireClientListeners(session);
-    if (mounted) {
-      setState(() => _status = 'Verbinde mit dem Raum...');
-    }
-    final socket = await WebSocket.connect(widget.config.effectiveServerUrl);
-    // Ein zuvor gespeichertes Reconnect-Token (falls für diesen Raum
-    // vorhanden) fordert denselben Sitzplatz zurück, statt einen neuen zu
-    // beziehen - wichtig, wenn die Partie schon läuft.
-    final history = await loadInternetRoomHistory();
-    final saved = history.where((e) => e.roomCode == widget.config.inviteCode);
-    await session.connectVia(
-      WebSocketTransport(socket),
-      name: widget.config.effectiveName,
-      roomCode: widget.config.inviteCode,
-      reconnectToken: saved.isEmpty ? null : saved.first.reconnectToken,
-    );
-    await _rememberSession(session);
-    _afterClientConnected(session);
-    if (!mounted) return;
-    setState(() => _inviteCode = session.roomCode);
-  }
-
-  /// [isOver] hält die lokale Raum-Historie mit dem tatsächlichen
-  /// Partie-Zustand synchron - bewusst bei jedem Snapshot neu aufgerufen
-  /// (nicht nur beim ersten Verbinden), damit ein Partie-Ende ODER ein
-  /// Neustart (Owner startet erneut, `isOver` wird wieder `false`) auch
-  /// dann in der Historie ankommt, wenn die Partie in einer anderen
-  /// Sitzung/an einem anderen Tag beendet wurde.
-  Future<void> _rememberSession(
-    ClientSession session, {
-    bool isOver = false,
-  }) async {
-    final roomCode = session.roomCode;
-    final token = session.reconnectToken;
-    if (roomCode == null || token == null) return;
-    await rememberInternetRoom(
-      InternetRoomEntry(
-        roomCode: roomCode,
-        playerName: widget.config.effectiveName,
-        reconnectToken: token,
-        lastSeen: DateTime.now(),
-        isOver: isOver,
-        roomName: session.roomName,
-        // Nur die MITSPIELER:innen, nicht die eigene Person - die kennt man
-        // ja schon (siehe playerName). Bevorzugt aus dem Spielstand (auch
-        // nach Spielstart noch aktuell), sonst aus der Lobby-Liste (vor
-        // Spielstart) - `_lobbyPlayers` wird nach Spielstart nicht mehr
-        // aktualisiert, da keine `LobbyMessage`s mehr eintreffen.
-        playerNames: [
-          for (final name
-              in _snapshot != null
-                  ? [for (final p in _snapshot!.players) p.name]
-                  : [for (final p in _lobbyPlayers) p.name])
-            if (name != widget.config.effectiveName) name,
-        ],
-      ),
-    );
   }
 
   void _wireClientListeners(ClientSession session) {
@@ -300,87 +192,11 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         _status = 'Spielzustand empfangen (${snapshot.players.length} Spieler)';
         _errorText = null;
       });
-      unawaited(_rememberSession(session, isOver: snapshot.isOver));
     });
     session.errors.listen((message) {
       if (!mounted) return;
       setState(() => _errorText = message);
     });
-    // Nur im Internet-Modus automatisch neu verbinden: LAN hat keinen
-    // dauerhaften Server/kein Reconnect-Token-System, ein getrennter
-    // direkter TCP-Host ist i. d. R. tatsächlich weg. `_inviteCode == null`
-    // heißt, die Verbindung riss ab, bevor überhaupt ein Raum-Code bekannt
-    // wurde (z. B. mitten im allerersten Handshake) - dafür gibt es nichts,
-    // womit sich sinnvoll neu verbinden ließe, das würde sonst für immer
-    // erfolglos wiederholen.
-    if (!_isLan) {
-      session.disconnected.listen((_) {
-        if (_inviteCode != null) unawaited(_attemptReconnect());
-      });
-    }
-  }
-
-  /// Versucht wiederholt (mit wachsendem Abstand), nach einem Verbindungs-
-  /// verlust denselben Raum-Sitzplatz zurückzuerobern - siehe [_reconnecting]
-  /// für den Hintergrund. Gibt nie endgültig auf (ein Deploy kann je nach
-  /// Situation unterschiedlich lange dauern); die Person kann die Partie
-  /// jederzeit über "Zurück zur Lobby" verlassen, falls gewünscht.
-  Future<void> _attemptReconnect() async {
-    if (_reconnecting || !mounted) return;
-    setState(() {
-      _reconnecting = true;
-      _errorText = 'Verbindung verloren – versuche erneut zu verbinden…';
-    });
-    var attempt = 0;
-    while (mounted && _reconnecting) {
-      attempt += 1;
-      try {
-        await _reconnectInternet();
-        if (!mounted) return;
-        setState(() {
-          _reconnecting = false;
-          _errorText = null;
-          _status = 'Wieder verbunden';
-        });
-        return;
-      } catch (_) {
-        if (!mounted) return;
-        final delaySeconds = attempt * 2 > 15 ? 15 : attempt * 2;
-        setState(
-          () => _errorText =
-              'Verbindung verloren – nächster Versuch in ${delaySeconds}s…',
-        );
-        await Future.delayed(Duration(seconds: delaySeconds));
-      }
-    }
-  }
-
-  /// Baut die Internet-Verbindung mit demselben Raum-Code + dem lokal
-  /// gespeicherten Reconnect-Token neu auf (derselbe Ablauf wie beim
-  /// manuellen Beitreten über die Lobby, siehe [_joinInternet] - hier nur
-  /// über [_inviteCode] statt `widget.config.inviteCode`, da auch die
-  /// Person, die den Raum ursprünglich erstellt hat, den vom Server
-  /// zugewiesenen Code erst nach dem Verbinden kennt).
-  Future<void> _reconnectInternet() async {
-    final roomCode = _inviteCode;
-    if (roomCode == null) throw StateError('Kein Raum-Code bekannt.');
-    final session = ClientSession();
-    _wireClientListeners(session);
-    final socket = await WebSocket.connect(widget.config.effectiveServerUrl);
-    final history = await loadInternetRoomHistory();
-    final saved = history.where((e) => e.roomCode == roomCode);
-    await session.connectVia(
-      WebSocketTransport(socket),
-      name: widget.config.effectiveName,
-      roomCode: roomCode,
-      reconnectToken: saved.isEmpty ? null : saved.first.reconnectToken,
-    );
-    await _rememberSession(
-      session,
-      isOver: session.latestSnapshot?.isOver ?? false,
-    );
-    unawaited(_clientSession?.close());
-    _afterClientConnected(session);
   }
 
   void _afterClientConnected(ClientSession session) {
@@ -394,10 +210,6 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
           _gameStarted = true;
         });
       }
-      // Reconnect zu einer bereits beendeten Partie (z. B. nach Tagen) -
-      // die Historie kannte den Ausgang bisher nur, wenn man das Ende live
-      // miterlebt hatte.
-      unawaited(_rememberSession(session, isOver: snapshot.isOver));
     }
     _clientSession = session;
   }
@@ -529,8 +341,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
         // ist.
         canInteract:
             _snapshot!.currentPlayerIndex == _snapshot!.yourPlayerIndex &&
-            !_snapshot!.isOver &&
-            !_reconnecting,
+            !_snapshot!.isOver,
         onSendMove: _sendMove,
         onSendPass: _sendPass,
         onSendExchange: _sendExchange,
@@ -551,7 +362,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _isLan ? 'LAN-Verbindung' : 'Internet-Verbindung',
+              'LAN-Verbindung',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
@@ -560,7 +371,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
             if (_isInitializing)
               const Center(child: CircularProgressIndicator())
             else ...[
-              if (_isLan && isHosting && _localAddresses.isNotEmpty) ...[
+              if (isHosting && _localAddresses.isNotEmpty) ...[
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.router),
@@ -573,16 +384,6 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
                           )
                           .join(' oder '),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (_inviteCode != null) ...[
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.vpn_key),
-                    title: const Text('Einladungscode'),
-                    subtitle: SelectableText(_inviteCode!),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -604,7 +405,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                _isLan ? 'Mehrspieler-Lobby' : 'Internet-Lobby',
+                'Mehrspieler-Lobby',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
