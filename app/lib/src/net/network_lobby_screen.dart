@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/human_readable_error.dart';
 import '../settings/app_settings.dart';
 import 'internet_room_history.dart';
 import 'internet_room_screen.dart';
@@ -321,7 +322,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                     ),
                   );
                 } catch (error) {
-                  setState(() => _errorText = error.toString());
+                  setState(() => _errorText = humanReadableError(error));
                 }
               },
               child: Text(_isHosting ? 'Host starten' : 'Beitreten'),

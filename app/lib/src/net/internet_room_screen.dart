@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/human_readable_error.dart';
 import 'internet_room_history.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
@@ -97,7 +98,7 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _initError = '$error');
+      setState(() => _initError = humanReadableError(error));
     } finally {
       if (mounted) setState(() => _isInitializing = false);
     }
