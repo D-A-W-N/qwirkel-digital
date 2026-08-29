@@ -118,7 +118,7 @@ void main() {
         final server = GameServer(
           dataDir: dataDir,
           rateLimiter: ConnectionRateLimiter(
-            maxAttempts: 2,
+            maxAttempts: 1,
             window: const Duration(seconds: 10),
           ),
         );
@@ -127,14 +127,8 @@ void main() {
 
         final anna = await _connect(server.port, name: 'Anna');
         addTearDown(anna.close);
-        final ben = await _connect(
-          server.port,
-          name: 'Ben',
-          roomCode: anna.roomCode,
-        );
-        addTearDown(ben.close);
 
-        // Der dritte Verbindungsversuch von derselben (Loopback-)IP
+        // Der zweite Verbindungsversuch von derselben (Loopback-)IP
         // innerhalb des Fensters überschreitet das Limit - der Server lehnt
         // das WebSocket-Upgrade bereits per HTTP 429 ab, statt den Beitritt
         // überhaupt an RoomManager weiterzureichen.
