@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'messages.dart';
@@ -52,7 +53,14 @@ class RoomManager {
     final NetMessage message;
     try {
       message = decodeMessage(line);
-    } on FormatException {
+    } catch (e) {
+      // Nicht nur `FormatException` (ungültiges JSON): ein einzelnes Feld
+      // mit falschem Typ/fehlend (z. B. `JoinMessage.fromJson`s `as String`)
+      // wirft stattdessen einen `TypeError` - beides bedeutet dasselbe
+      // ("keine verwertbare Erstnachricht"), beides darf diesen Handler
+      // nicht unbehandelt verlassen (das würde die Verbindung mit einem
+      // rohen Stacktrace statt einer sauberen Trennung beenden).
+      stderr.writeln('[RoomManager] Ungültige Erstnachricht verworfen: $e');
       unawaited(transport.close());
       return;
     }
