@@ -19,6 +19,11 @@ class GameController extends ChangeNotifier {
   /// Für den Tausch ausgewählte Hand-Indizes.
   final Set<int> selectedForExchange = {};
 
+  /// Per Antippen ausgewählter Hand-Stein für die Tap-to-Place-Alternative
+  /// zu Drag&Drop (siehe [selectHandTile]) - `null`, solange nichts
+  /// ausgewählt ist.
+  int? selectedHandIndex;
+
   String? lastError;
   int? lastMoveScore;
 
@@ -53,6 +58,16 @@ class GameController extends ChangeNotifier {
 
   bool get hasExchangeSelection => selectedForExchange.isNotEmpty;
 
+  /// Wählt den Hand-Stein bei [index] für die Tap-to-Place-Alternative aus
+  /// (erneutes Antippen desselben Index hebt die Auswahl wieder auf,
+  /// `null` hebt sie ebenfalls auf). Ein bereits per Drag&Drop oder Tippen
+  /// gestagter Index kann nicht ausgewählt werden - er ist schon platziert.
+  void selectHandTile(int? index) {
+    if (index != null && _handIndexByPosition.containsValue(index)) return;
+    selectedHandIndex = selectedHandIndex == index ? null : index;
+    notifyListeners();
+  }
+
   /// Platziert den Hand-Stein bei [handIndex] (vorläufig) auf [position].
   void stageTile(int handIndex, Position position) {
     final hand = game.currentPlayer.hand;
@@ -75,6 +90,7 @@ class GameController extends ChangeNotifier {
       lastError = null;
       lastBotPlacements = {};
       lastBotSummary = null;
+      selectedHandIndex = null;
     } on InvalidMoveException catch (e) {
       // notifyListeners() darf hier NICHT übersprungen werden: ohne ihn
       // bleibt `lastError` zwar gesetzt, aber die UI (ref.watch) bekommt nie
@@ -106,6 +122,7 @@ class GameController extends ChangeNotifier {
     _handIndexByPosition.clear();
     pendingScore = null;
     lastError = null;
+    selectedHandIndex = null;
     notifyListeners();
   }
 
@@ -138,6 +155,7 @@ class GameController extends ChangeNotifier {
       pendingPlacements.clear();
       _handIndexByPosition.clear();
       pendingScore = null;
+      selectedHandIndex = null;
     } on InvalidMoveException catch (e) {
       lastError = _humanReadableMessage(e.reason, e.message);
     }
@@ -179,6 +197,7 @@ class GameController extends ChangeNotifier {
     pendingPlacements.clear();
     _handIndexByPosition.clear();
     selectedForExchange.clear();
+    selectedHandIndex = null;
     lastError = null;
     lastBotPlacements = {};
     lastBotSummary = null;
@@ -187,10 +206,7 @@ class GameController extends ChangeNotifier {
 
   bool get isCurrentPlayerBot => game.currentPlayer.isBot;
 
-  String _humanReadableMessage(
-    InvalidMoveReason reason,
-    String fallback,
-  ) {
+  String _humanReadableMessage(InvalidMoveReason reason, String fallback) {
     switch (reason) {
       case InvalidMoveReason.emptyPlacement:
         return 'Bitte platziere mindestens einen Stein.';
@@ -250,6 +266,7 @@ class GameController extends ChangeNotifier {
     pendingPlacements.clear();
     _handIndexByPosition.clear();
     selectedForExchange.clear();
+    selectedHandIndex = null;
     notifyListeners();
   }
 }

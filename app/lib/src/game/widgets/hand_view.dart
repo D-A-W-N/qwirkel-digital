@@ -30,6 +30,8 @@ class HandView extends ConsumerWidget {
       exchangeMode: exchangeMode,
       selectedForExchange: controller.selectedForExchange,
       onToggleExchange: controller.toggleExchangeSelection,
+      selectedHandIndex: controller.selectedHandIndex,
+      onSelectHandTile: controller.selectHandTile,
     );
   }
 }
@@ -44,6 +46,8 @@ class HandRow extends StatelessWidget {
     required this.exchangeMode,
     required this.selectedForExchange,
     required this.onToggleExchange,
+    this.selectedHandIndex,
+    this.onSelectHandTile,
   });
 
   final List<Tile?> slots;
@@ -51,6 +55,13 @@ class HandRow extends StatelessWidget {
   final bool exchangeMode;
   final Set<int> selectedForExchange;
   final void Function(int handIndex) onToggleExchange;
+
+  /// Tap-to-Place-Alternative zu Drag&Drop (siehe `GameController
+  /// .selectHandTile`/`BoardSurface.onTapEmptyCell`) - `null` (Standard)
+  /// deaktiviert die Tap-Auswahl vollständig, ohne Drag&Drop selbst zu
+  /// beeinträchtigen.
+  final int? selectedHandIndex;
+  final void Function(int handIndex)? onSelectHandTile;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +79,10 @@ class HandRow extends StatelessWidget {
               exchangeMode: exchangeMode,
               selectedForExchange: selectedForExchange.contains(i),
               onToggleExchange: () => onToggleExchange(i),
+              selected: selectedHandIndex == i,
+              onSelect: onSelectHandTile == null
+                  ? null
+                  : () => onSelectHandTile!(i),
             ),
         ],
       ),
@@ -84,6 +99,8 @@ class HandSlot extends StatelessWidget {
     required this.exchangeMode,
     required this.selectedForExchange,
     required this.onToggleExchange,
+    this.selected = false,
+    this.onSelect,
   });
 
   final int index;
@@ -92,6 +109,10 @@ class HandSlot extends StatelessWidget {
   final bool exchangeMode;
   final bool selectedForExchange;
   final VoidCallback onToggleExchange;
+
+  /// Siehe `HandRow.selectedHandIndex`/`onSelectHandTile`.
+  final bool selected;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -108,14 +129,30 @@ class HandSlot extends StatelessWidget {
         child: TileView(tile: currentTile, highlighted: selectedForExchange),
       );
     }
-    return Draggable<int>(
-      data: index,
-      feedback: Material(
-        color: Colors.transparent,
-        child: TileView(tile: currentTile, size: 56),
+    // Drag&Drop bleibt unverändert nutzbar; zusätzlich macht Antippen
+    // denselben Stein für die Tap-to-Place-Alternative auswählbar (siehe
+    // `BoardSurface.onTapEmptyCell`) - beide Bedienwege koexistieren.
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: selected
+          ? 'Stein ausgewählt, erneut antippen zum Abwählen'
+          : 'Stein auswählen',
+      child: GestureDetector(
+        onTap: onSelect,
+        child: Draggable<int>(
+          data: index,
+          feedback: Material(
+            color: Colors.transparent,
+            child: TileView(tile: currentTile, size: 56),
+          ),
+          childWhenDragging: Opacity(
+            opacity: 0.3,
+            child: TileView(tile: currentTile),
+          ),
+          child: TileView(tile: currentTile, highlighted: selected),
+        ),
       ),
-      childWhenDragging: Opacity(opacity: 0.3, child: TileView(tile: currentTile)),
-      child: TileView(tile: currentTile),
     );
   }
 }
