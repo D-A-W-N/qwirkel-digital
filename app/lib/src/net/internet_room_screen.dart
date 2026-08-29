@@ -22,6 +22,7 @@ class InternetRoomScreen extends ConsumerStatefulWidget {
   // Parametertyp auf das nullable Feld (geteilt mit `.existingRoom`) statt
   // auf den hier tatsächlich verlangten nicht-nullablen Typ aufweiten.
   const InternetRoomScreen({super.key, required NetworkConnectionConfig config})
+    // ignore: prefer_initializing_formals
     : config = config,
       existingRoomCode = null;
 
