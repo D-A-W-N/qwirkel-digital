@@ -87,16 +87,24 @@ class BoardSurface extends StatelessWidget {
               top: geometry.pixelY(position.y),
               width: cellSize,
               height: cellSize,
-              child: _BoardCell(
-                key: ValueKey('board-${position.x}-${position.y}'),
-                position: position,
-                existingTile: board[position],
-                pendingTile: pendingPlacements[position],
-                canInteract: canInteract,
-                onDropTile: onDropTile,
-                onUnstage: onUnstage,
-                tileSize: tileSize,
-                highlighted: highlightedPositions.contains(position),
+              // Isoliert das Neuzeichnen jeder Zelle von ihren Nachbarn: der
+              // umgebende `GameController`/`GameStateSnapshot` benachrichtigt
+              // bei JEDER Änderung (Punktestand, Statustext, Hand), nicht nur
+              // bei Board-Änderungen - ohne Grenze würde ein unveränderter
+              // Stein (mit eigenem `CustomPaint` in `TileView`) bei jedem
+              // dieser Rebuilds trotzdem neu gezeichnet.
+              child: RepaintBoundary(
+                child: _BoardCell(
+                  key: ValueKey('board-${position.x}-${position.y}'),
+                  position: position,
+                  existingTile: board[position],
+                  pendingTile: pendingPlacements[position],
+                  canInteract: canInteract,
+                  onDropTile: onDropTile,
+                  onUnstage: onUnstage,
+                  tileSize: tileSize,
+                  highlighted: highlightedPositions.contains(position),
+                ),
               ),
             ),
         ],
