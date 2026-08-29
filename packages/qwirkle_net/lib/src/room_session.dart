@@ -409,7 +409,12 @@ class RoomSession {
   }
 
   Future<void> close() async {
-    for (final seat in seats) {
+    // Über eine Kopie iterieren: Schließt ein Sitzplatz-Transport hier vor
+    // Spielstart, kann dessen `onDone` synchron `_handleDisconnect` auslösen,
+    // das den Sitzplatz aus [seats] entfernt - eine Iteration direkt über
+    // [seats] würde dabei mit einem "Concurrent modification"-Fehler
+    // abbrechen, sobald mehr als ein Sitzplatz betroffen ist.
+    for (final seat in List<RoomSeat>.of(seats)) {
       await seat.subscription?.cancel();
       await seat.transport?.close();
     }
