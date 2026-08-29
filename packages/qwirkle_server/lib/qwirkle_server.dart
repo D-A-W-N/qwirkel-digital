@@ -4,5 +4,6 @@
 /// Prozess-Neustart (Redeploy) überstehen.
 library;
 
+export 'src/connection_rate_limiter.dart';
 export 'src/game_server.dart';
 export 'src/room_store.dart';
