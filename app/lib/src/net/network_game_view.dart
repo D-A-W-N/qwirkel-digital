@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../game/widgets/board_surface.dart';
+import '../history/match_history.dart';
 import '../game/widgets/compact_button_style.dart';
 import '../game/widgets/game_bottom_bar.dart';
 import '../game/widgets/hand_view.dart';
@@ -55,6 +57,15 @@ class NetworkGameView extends StatefulWidget {
   /// freizugeben. `null` (LAN-Modus) zeigt keinen solchen Button.
   final VoidCallback? onLeaveRoom;
 
+  /// Ob dies eine LAN- oder eine Internet-Partie ist - nur für die
+  /// Partie-Historie (siehe [didUpdateWidget]) relevant, sonst ohne
+  /// Auswirkung auf dieses Widget.
+  final MatchMode mode;
+
+  /// Nur für Internet-Partien gesetzt (LAN kennt keine Raum-Codes) - fließt
+  /// ausschließlich in den [MatchRecord] der Partie-Historie ein.
+  final String? roomCode;
+
   const NetworkGameView({
     super.key,
     required this.snapshot,
@@ -65,6 +76,8 @@ class NetworkGameView extends StatefulWidget {
     required this.onSendExchange,
     required this.isRoomOwner,
     required this.onRestartGame,
+    required this.mode,
+    this.roomCode,
     this.statusText,
     this.errorText,
     this.onLeaveRoom,
@@ -102,6 +115,18 @@ class _NetworkGameViewState extends State<NetworkGameView> {
   /// ausgewählt - spiegelt `HandView`s `exchangeMode` im lokalen Spiel.
   bool _exchangeMode = false;
   final Set<int> _selectedForExchange = {};
+
+  /// Tap-to-Place-Alternative zu Drag&Drop - spiegelt
+  /// `GameController.selectedHandIndex` im lokalen Spiel.
+  int? _selectedHandIndex;
+
+  /// Siehe `GameController.selectHandTile`.
+  void _selectHandTile(int? index) {
+    if (index != null && _handIndexByPosition.containsValue(index)) return;
+    setState(() {
+      _selectedHandIndex = _selectedHandIndex == index ? null : index;
+    });
+  }
 
   /// Eigener Messenger statt `ScaffoldMessenger.of(context)`: `context`
   /// dieses States liegt OBERHALB des eigenen `Scaffold`s (das erst in
@@ -184,6 +209,24 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // ALTEN Hand) auf die KOMPLETT NEUE Hand angewendet und blendete dort
     // einen falschen, unzusammenhängenden Stein aus/wieder ein.
     final restarted = oldWidget.snapshot.isOver && !widget.snapshot.isOver;
+    final justFinished = !oldWidget.snapshot.isOver && widget.snapshot.isOver;
+    if (justFinished) {
+      unawaited(
+        recordMatch(
+          MatchRecord(
+            playedAt: DateTime.now(),
+            mode: widget.mode,
+            roomCode: widget.roomCode,
+            standings: [
+              for (final player in [
+                ...widget.snapshot.players,
+              ]..sort((a, b) => b.score.compareTo(a.score)))
+                MatchPlayerResult(name: player.name, score: player.score),
+            ],
+          ),
+        ),
+      );
+    }
     if (turnAdvancedAwayFromMe || restarted) {
       if (_pendingPlacements.isNotEmpty) {
         _pendingPlacements.clear();
@@ -193,6 +236,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
         _exchangeMode = false;
         _selectedForExchange.clear();
       }
+      _selectedHandIndex = null;
     }
     if (restarted) {
       _liveError = null;
@@ -287,14 +331,17 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     try {
       previewBoard.scorePlacement(candidatePlacements);
     } on InvalidMoveException catch (e) {
+      HapticFeedback.mediumImpact();
       setState(() => _liveError = e.message);
       return;
     }
 
+    HapticFeedback.selectionClick();
     setState(() {
       _pendingPlacements[position] = widget.ownHand[handIndex];
       _handIndexByPosition[position] = handIndex;
       _liveError = null;
+      _selectedHandIndex = null;
     });
   }
 
@@ -546,6 +593,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                     _pendingPlacements.clear();
                     _handIndexByPosition.clear();
                     _liveError = null;
+                    _selectedHandIndex = null;
                   })
                 : null,
             child: const Text('Zurücknehmen'),
@@ -574,6 +622,7 @@ class _NetworkGameViewState extends State<NetworkGameView> {
               ? () => setState(() {
                   _exchangeMode = !_exchangeMode;
                   _selectedForExchange.clear();
+                  _selectedHandIndex = null;
                 })
               : null,
           child: Text(_exchangeMode ? 'Abbrechen' : 'Steine tauschen…'),
@@ -665,6 +714,13 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                       cellSize: _cellSize,
                       tileSize: _tileSize,
                       highlightedPositions: lastMovePositions,
+                      hasSelection: _selectedHandIndex != null,
+                      onTapEmptyCell: (position) {
+                        final index = _selectedHandIndex;
+                        if (index != null) {
+                          _stageTile(board, index, position);
+                        }
+                      },
                     ),
                     if (pendingScore != null)
                       Positioned(
@@ -828,6 +884,8 @@ class _NetworkGameViewState extends State<NetworkGameView> {
                         exchangeMode: _exchangeMode,
                         selectedForExchange: _selectedForExchange,
                         onToggleExchange: _toggleExchangeSelection,
+                        selectedHandIndex: _selectedHandIndex,
+                        onSelectHandTile: _selectHandTile,
                       ),
                       const SizedBox(height: 6),
                       _buildActionButtons(isMyTurn),

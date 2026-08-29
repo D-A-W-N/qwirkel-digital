@@ -21,6 +21,8 @@ class BoardSurface extends StatelessWidget {
     required this.cellSize,
     required this.tileSize,
     this.highlightedPositions = const {},
+    this.hasSelection = false,
+    this.onTapEmptyCell,
   });
 
   final Map<Position, Tile> board;
@@ -30,6 +32,14 @@ class BoardSurface extends StatelessWidget {
   final void Function(Position position) onUnstage;
   final double cellSize;
   final double tileSize;
+
+  /// Tap-to-Place-Alternative zu Drag&Drop: ob gerade ein Hand-Stein zur
+  /// Platzierung ausgewählt ist (steuert, ob leere Felder als "hier
+  /// platzierbar" markiert werden und ob [onTapEmptyCell] überhaupt
+  /// reagiert) - `false`/`null` (Standard) lässt das Verhalten unverändert
+  /// reines Drag&Drop.
+  final bool hasSelection;
+  final void Function(Position position)? onTapEmptyCell;
 
   /// Zuletzt platzierte Steine (Bot-Zug lokal, fremder Zug im Netzwerkspiel)
   /// - kurz hervorgehoben, damit sichtbar ist, was gerade passiert ist.
@@ -41,10 +51,8 @@ class BoardSurface extends StatelessWidget {
     // Bounding Box, damit sich der sichtbare Bereich schon während des
     // eigenen Zugs erweitert, statt erst nach dem nächsten bestätigten
     // Spielstand.
-    final positions = [...board.keys, ...pendingPlacements.keys];
-    if (positions.isEmpty) {
-      positions.add(const Position(0, 0));
-    }
+    final occupied = {...board.keys, ...pendingPlacements.keys};
+    final positions = occupied.isEmpty ? {const Position(0, 0)} : occupied;
 
     var minX = positions.first.x;
     var maxX = positions.first.x;
@@ -58,17 +66,20 @@ class BoardSurface extends StatelessWidget {
       maxY = maxY > position.y ? maxY : position.y;
     }
 
-    minX -= 2;
-    maxX += 2;
-    minY -= 2;
-    maxY += 2;
-
-    final boardPositions = <Position>[];
-    for (var x = minX; x <= maxX; x++) {
-      for (var y = minY; y <= maxY; y++) {
-        boardPositions.add(Position(x, y));
-      }
-    }
+    // Statt eines vollen Rechtecks über die Bounding Box (mit ±2 Feldern
+    // Rand) nur tatsächlich belegte Felder plus zwei "Ringe" freier
+    // Nachbarfelder rendern: Ring 1 sind die einzigen Felder, an denen
+    // überhaupt legal neu angelegt werden kann (siehe `anchorPositions` -
+    // dieselbe Definition, die auch der Bot für seine Zuggenerierung
+    // verwendet), Ring 2 ist rein kosmetischer Rand darum. Bei weit
+    // auseinandergezogenen Zügen (z. B. Brücken-Züge über ein bestehendes
+    // Feld hinweg) wuchs die alte Rechteck-Fläche quadratisch mit dem
+    // Abstand zwischen den Clustern, obwohl der leere Raum dazwischen nie
+    // interaktiv war - je nach Boardform potenziell hunderte nutzlose
+    // Drop-Ziele pro Frame.
+    final ring1 = anchorPositions(occupied);
+    final ring2 = anchorPositions({...occupied, ...ring1});
+    final boardPositions = {...occupied, ...ring1, ...ring2};
 
     final geometry = BoardGeometry(cellSize);
 
@@ -86,16 +97,26 @@ class BoardSurface extends StatelessWidget {
               top: geometry.pixelY(position.y),
               width: cellSize,
               height: cellSize,
-              child: _BoardCell(
-                key: ValueKey('board-${position.x}-${position.y}'),
-                position: position,
-                existingTile: board[position],
-                pendingTile: pendingPlacements[position],
-                canInteract: canInteract,
-                onDropTile: onDropTile,
-                onUnstage: onUnstage,
-                tileSize: tileSize,
-                highlighted: highlightedPositions.contains(position),
+              // Isoliert das Neuzeichnen jeder Zelle von ihren Nachbarn: der
+              // umgebende `GameController`/`GameStateSnapshot` benachrichtigt
+              // bei JEDER Änderung (Punktestand, Statustext, Hand), nicht nur
+              // bei Board-Änderungen - ohne Grenze würde ein unveränderter
+              // Stein (mit eigenem `CustomPaint` in `TileView`) bei jedem
+              // dieser Rebuilds trotzdem neu gezeichnet.
+              child: RepaintBoundary(
+                child: _BoardCell(
+                  key: ValueKey('board-${position.x}-${position.y}'),
+                  position: position,
+                  existingTile: board[position],
+                  pendingTile: pendingPlacements[position],
+                  canInteract: canInteract,
+                  onDropTile: onDropTile,
+                  onUnstage: onUnstage,
+                  tileSize: tileSize,
+                  highlighted: highlightedPositions.contains(position),
+                  hasSelection: hasSelection,
+                  onTapEmptyCell: onTapEmptyCell,
+                ),
               ),
             ),
         ],
@@ -115,6 +136,8 @@ class _BoardCell extends StatelessWidget {
     required this.onUnstage,
     required this.tileSize,
     this.highlighted = false,
+    this.hasSelection = false,
+    this.onTapEmptyCell,
   });
 
   final Position position;
@@ -125,6 +148,8 @@ class _BoardCell extends StatelessWidget {
   final void Function(Position position) onUnstage;
   final double tileSize;
   final bool highlighted;
+  final bool hasSelection;
+  final void Function(Position position)? onTapEmptyCell;
 
   @override
   Widget build(BuildContext context) {
@@ -155,22 +180,34 @@ class _BoardCell extends StatelessWidget {
       );
     }
 
+    final tapSelectable = canInteract && hasSelection;
     return DragTarget<int>(
       onWillAcceptWithDetails: (details) => canInteract,
       onAcceptWithDetails: (details) => onDropTile(details.data, position),
       builder: (context, candidateData, rejectedData) {
-        final active = candidateData.isNotEmpty;
+        // Bei aktiver Tap-Auswahl gelten ALLE leeren Felder als
+        // "hier platzierbar" (nicht nur das gerade bedraggte) - wichtig als
+        // Orientierungshilfe für Personen, die per Tippen statt per
+        // Drag&Drop platzieren.
+        final active = candidateData.isNotEmpty || tapSelectable;
         final colorScheme = Theme.of(context).colorScheme;
-        return Container(
-          margin: const EdgeInsets.all(1),
-          decoration: BoxDecoration(
-            color: active
-                ? colorScheme.primary.withValues(alpha: 0.15)
-                : Colors.transparent,
-            border: Border.all(
-              color: active
-                  ? colorScheme.primary.withValues(alpha: 0.6)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
+        return GestureDetector(
+          onTap: tapSelectable ? () => onTapEmptyCell?.call(position) : null,
+          child: Semantics(
+            button: tapSelectable,
+            label: tapSelectable ? 'Hier platzieren' : null,
+            child: Container(
+              margin: const EdgeInsets.all(1),
+              decoration: BoxDecoration(
+                color: active
+                    ? colorScheme.primary.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: active
+                      ? colorScheme.primary.withValues(alpha: 0.6)
+                      : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
             ),
           ),
         );

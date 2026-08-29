@@ -1,9 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/human_readable_error.dart';
+import '../history/match_history.dart';
 import 'internet_room_history.dart';
+import 'lobby_widgets.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
 import 'room_connection_manager.dart';
@@ -97,7 +101,7 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _initError = '$error');
+      setState(() => _initError = humanReadableError(error));
     } finally {
       if (mounted) setState(() => _isInitializing = false);
     }
@@ -111,6 +115,19 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
     // Widget-Kontext hier bereits unmounted sein kann.
     _manager.setForegroundRoom(null);
     super.dispose();
+  }
+
+  Future<void> _copyRoomCode(BuildContext context, String roomCode) async {
+    await Clipboard.setData(ClipboardData(text: roomCode));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Einladungscode kopiert'),
+          duration: Duration(seconds: 2),
+        ),
+      );
   }
 
   Future<void> _confirmLeaveRoom(BuildContext context, String roomCode) async {
@@ -172,6 +189,8 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
       return NetworkGameView(
         snapshot: snapshot,
         ownHand: snapshot.players[snapshot.yourPlayerIndex].hand ?? const [],
+        mode: MatchMode.internet,
+        roomCode: roomCode,
         canInteract:
             snapshot.currentPlayerIndex == snapshot.yourPlayerIndex &&
             !snapshot.isOver &&
@@ -210,6 +229,11 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
                 leading: const Icon(Icons.vpn_key),
                 title: const Text('Einladungscode'),
                 subtitle: SelectableText(roomCode),
+                trailing: IconButton(
+                  icon: const Icon(Icons.copy),
+                  tooltip: 'Code kopieren',
+                  onPressed: () => _copyRoomCode(context, roomCode),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -218,41 +242,20 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            if (entry.lobbyPlayers.isEmpty)
-              const Text('Noch keine Teilnehmer')
-            else
-              ...entry.lobbyPlayers.map(
-                (player) => ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(player.name),
-                  trailing: Icon(Icons.pending, color: Colors.orange.shade700),
-                ),
-              ),
+            LobbyPlayerList(players: entry.lobbyPlayers),
             const Spacer(),
-            if (entry.isRoomOwner) ...[
-              SizedBox(
+            LobbyActionButtons(
+              hasOwnerControls: entry.isRoomOwner,
+              gameStarted: false,
+              onStartGame: entry.session.sendStartGame,
+              onBack: () => Navigator.of(context).pop(),
+              backLabel: 'Zurück (Verbindung bleibt bestehen)',
+              additionalAction: SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: entry.session.sendStartGame,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Spiel starten'),
+                child: OutlinedButton(
+                  onPressed: () => _confirmLeaveRoom(context, roomCode),
+                  child: const Text('Raum verlassen'),
                 ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Zurück (Verbindung bleibt bestehen)'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => _confirmLeaveRoom(context, roomCode),
-                child: const Text('Raum verlassen'),
               ),
             ),
           ],

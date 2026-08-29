@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.9.22] - 2026-08-29
+
+- Added a "Partie-Historie" (match history) screen listing past local, LAN, and internet games with final standings - previously a finished game left no trace anywhere once you navigated away
+- The app now remembers your own display name across sessions instead of asking for it again every time you open local setup or the network lobby
+- Tiles can now be placed by tapping instead of only dragging: tap a hand tile to select it, then tap an empty board cell - a full alternative for anyone who finds drag gestures difficult, coexisting with drag-and-drop
+- The main setup screen, which had grown into one long scrolling list of everything (local setup, network entry points, rules, settings), is now split into three tabs (Spielen/Online/Mehr)
+- Tiles now visually follow the selected light/dark theme instead of always using the same hardcoded dark background regardless of theme
+- Added a dark mode toggle (System/Hell/Dunkel) in the settings
+- Placing a tile now gives short haptic feedback, distinct for a successful vs. a rejected placement
+- The invite code in an internet room can now be copied to the clipboard with one tap
+- Error messages (connection failures, invalid input, etc.) are now shown in plain language instead of raw technical exception text
+- Added missing screen-reader labels to several buttons (player count, tap-to-place targets)
+- The board now renders only cells that are actually reachable instead of the full bounding rectangle around all placed tiles, keeping it fast even when moves are placed far apart on a large board
+- The internet server now limits how many connection attempts a single IP address can make per minute, protecting against join-flood abuse
+- Fixed the internet server crashing instead of logging and ignoring an unexpected or malformed message from a client
+
 ## [0.9.21] - 2026-08-29
 
 - Fixed a crash ("Concurrent modification during iteration") in the internet server backend when a room with two or more still-connected, pre-game seats was torn down (e.g. during a redeploy) - closing each seat's connection could trigger another seat's disconnect handler to remove itself from the same list being iterated over

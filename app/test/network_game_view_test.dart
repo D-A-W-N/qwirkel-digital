@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
+import 'package:qwirkle_digital/src/history/match_history.dart';
 import 'package:qwirkle_digital/src/net/network_game_view.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
@@ -21,6 +22,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: snapshot,
             ownHand: hand,
             canInteract: true,
@@ -61,6 +63,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: snapshot,
             ownHand: hand,
             canInteract: false,
@@ -114,6 +117,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: disconnectedSnapshot,
             ownHand: hand,
             canInteract: false,
@@ -156,6 +160,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: false,
@@ -197,6 +202,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: snapshot,
             ownHand: hand,
             canInteract: false,
@@ -222,6 +228,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: snapshot,
             ownHand: hand,
             canInteract: false,
@@ -260,6 +267,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: true,
@@ -298,6 +306,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: true,
@@ -359,6 +368,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: snapshot,
             ownHand: hand,
             canInteract: true,
@@ -413,6 +423,7 @@ void main() {
 
       Widget buildView({String? errorText}) => MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: true,
@@ -472,6 +483,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshotWithFullBag,
           ownHand: snapshotWithFullBag.players[0].hand ?? <Tile>[],
           canInteract: true,
@@ -502,6 +514,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshotWithEmptyBag,
           ownHand: snapshotWithEmptyBag.players[0].hand ?? <Tile>[],
           canInteract: true,
@@ -536,6 +549,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: true,
@@ -579,6 +593,7 @@ void main() {
 
       Widget buildView(GameStateSnapshot snapshot) => MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: baseSnapshot.players[0].hand ?? <Tile>[],
           canInteract: true,
@@ -653,6 +668,7 @@ void main() {
       Widget buildView(GameStateSnapshot snapshot, List<Tile> hand) =>
           MaterialApp(
             home: NetworkGameView(
+              mode: MatchMode.lan,
               snapshot: snapshot,
               ownHand: hand,
               canInteract: !snapshot.isOver,
@@ -748,6 +764,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: NetworkGameView(
+            mode: MatchMode.lan,
             snapshot: snapshot,
             ownHand: hand,
             canInteract: true,
@@ -787,6 +804,7 @@ void main() {
 
       Widget buildView(GameStateSnapshot snapshot) => MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: true,
@@ -854,6 +872,7 @@ void main() {
 
       Widget buildView({required bool canInteract}) => MaterialApp(
         home: NetworkGameView(
+          mode: MatchMode.lan,
           snapshot: snapshot,
           ownHand: hand,
           canInteract: canInteract,

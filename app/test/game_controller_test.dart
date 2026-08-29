@@ -3,65 +3,86 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_digital/src/game/game_controller.dart';
 
 void main() {
-  test('stageTile blockiert Zugpositionen, die eine Lücke in der Kette erzeugen', () {
-    final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
-    final controller = GameController(game);
+  // `stageTile` löst seit Kurzem `HapticFeedback` aus, das einen
+  // initialisierten Flutter-Binding-Kontext braucht (auch außerhalb von
+  // `testWidgets`) - ohne diese Zeile bricht jeder plain `test()` hier mit
+  // "Binding has not yet been initialized" ab.
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    game.currentPlayer.hand = [
-      const Tile(TileColor.red, TileShape.circle),
-      const Tile(TileColor.red, TileShape.cross),
-    ];
-    game.board.apply([
-      TilePlacement(
-        position: const Position(0, 0),
-        tile: const Tile(TileColor.red, TileShape.diamond),
-      ),
-    ]);
+  test(
+    'stageTile blockiert Zugpositionen, die eine Lücke in der Kette erzeugen',
+    () {
+      final game = QwirkleGame(
+        players: [Player(id: 'p1', name: 'Anna')],
+      );
+      final controller = GameController(game);
 
-    controller.stageTile(0, const Position(1, 0));
-    expect(controller.pendingPlacements, hasLength(1));
+      game.currentPlayer.hand = [
+        const Tile(TileColor.red, TileShape.circle),
+        const Tile(TileColor.red, TileShape.cross),
+      ];
+      game.board.apply([
+        TilePlacement(
+          position: const Position(0, 0),
+          tile: const Tile(TileColor.red, TileShape.diamond),
+        ),
+      ]);
 
-    controller.stageTile(1, const Position(3, 0));
+      controller.stageTile(0, const Position(1, 0));
+      expect(controller.pendingPlacements, hasLength(1));
 
-    expect(controller.pendingPlacements, hasLength(1));
-    expect(controller.lastError, isNotNull);
-    expect(controller.lastError, contains('lückenlos'));
-  });
+      controller.stageTile(1, const Position(3, 0));
 
-  test('unstageTile löscht eine veraltete Fehlermeldung einer vorherigen fehlgeschlagenen Platzierung', () {
-    final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
-    final controller = GameController(game);
+      expect(controller.pendingPlacements, hasLength(1));
+      expect(controller.lastError, isNotNull);
+      expect(controller.lastError, contains('lückenlos'));
+    },
+  );
 
-    game.currentPlayer.hand = [
-      const Tile(TileColor.red, TileShape.circle),
-      const Tile(TileColor.red, TileShape.cross),
-    ];
-    game.board.apply([
-      TilePlacement(
-        position: const Position(0, 0),
-        tile: const Tile(TileColor.red, TileShape.diamond),
-      ),
-    ]);
+  test(
+    'unstageTile löscht eine veraltete Fehlermeldung einer vorherigen fehlgeschlagenen Platzierung',
+    () {
+      final game = QwirkleGame(
+        players: [Player(id: 'p1', name: 'Anna')],
+      );
+      final controller = GameController(game);
 
-    controller.stageTile(0, const Position(1, 0));
-    controller.stageTile(1, const Position(3, 0)); // schlägt fehl (Lücke bei 2,0)
-    expect(controller.lastError, isNotNull);
+      game.currentPlayer.hand = [
+        const Tile(TileColor.red, TileShape.circle),
+        const Tile(TileColor.red, TileShape.cross),
+      ];
+      game.board.apply([
+        TilePlacement(
+          position: const Position(0, 0),
+          tile: const Tile(TileColor.red, TileShape.diamond),
+        ),
+      ]);
 
-    // Der Zug wird abgebrochen: der einzige vorläufige Stein wird zurückgenommen.
-    controller.unstageTile(const Position(1, 0));
+      controller.stageTile(0, const Position(1, 0));
+      controller.stageTile(
+        1,
+        const Position(3, 0),
+      ); // schlägt fehl (Lücke bei 2,0)
+      expect(controller.lastError, isNotNull);
 
-    expect(controller.pendingPlacements, isEmpty);
-    expect(
-      controller.lastError,
-      isNull,
-      reason:
-          'Nach dem Zurücknehmen darf keine Fehlermeldung mehr angezeigt werden, '
-          'die sich auf den bereits verworfenen Versuch bezieht.',
-    );
-  });
+      // Der Zug wird abgebrochen: der einzige vorläufige Stein wird zurückgenommen.
+      controller.unstageTile(const Position(1, 0));
+
+      expect(controller.pendingPlacements, isEmpty);
+      expect(
+        controller.lastError,
+        isNull,
+        reason:
+            'Nach dem Zurücknehmen darf keine Fehlermeldung mehr angezeigt werden, '
+            'die sich auf den bereits verworfenen Versuch bezieht.',
+      );
+    },
+  );
 
   test('pendingScore zeigt den Punktwert des vorbereiteten Zugs live an', () {
-    final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
+    final game = QwirkleGame(
+      players: [Player(id: 'p1', name: 'Anna')],
+    );
     final controller = GameController(game);
 
     game.currentPlayer.hand = [
@@ -101,7 +122,9 @@ void main() {
       // eine fehlgeschlagene Platzierung wie ein stillschweigend hängender
       // Bug wirkt (Nutzer-Feedback: "konnte keinen anderen Stein platzieren,
       // scheint mir ein Bug").
-      final game = QwirkleGame(players: [Player(id: 'p1', name: 'Anna')]);
+      final game = QwirkleGame(
+        players: [Player(id: 'p1', name: 'Anna')],
+      );
       final controller = GameController(game);
 
       game.currentPlayer.hand = [
@@ -144,7 +167,8 @@ void main() {
       );
       final human = Player(id: 'h', name: 'Ben');
       final game = QwirkleGame(players: [bot, human]);
-      game.currentPlayerIndex = 0; // Bot ist dran (Starthand entscheidet sonst zufällig).
+      game.currentPlayerIndex =
+          0; // Bot ist dran (Starthand entscheidet sonst zufällig).
       final controller = GameController(game);
 
       expect(controller.lastBotSummary, isNull);
@@ -164,4 +188,103 @@ void main() {
       expect(controller.lastBotPlacements, isEmpty);
     },
   );
+
+  test('selectHandTile wählt einen Hand-Index aus und togglet ihn ab', () {
+    final game = QwirkleGame(
+      players: [Player(id: 'p1', name: 'Anna')],
+    );
+    final controller = GameController(game);
+
+    expect(controller.selectedHandIndex, isNull);
+
+    controller.selectHandTile(2);
+    expect(controller.selectedHandIndex, 2);
+
+    // Erneutes Antippen desselben Index hebt die Auswahl wieder auf.
+    controller.selectHandTile(2);
+    expect(controller.selectedHandIndex, isNull);
+
+    controller.selectHandTile(1);
+    expect(controller.selectedHandIndex, 1);
+    // Ein ANDERER Index ersetzt die Auswahl, statt sie umzuschalten.
+    controller.selectHandTile(3);
+    expect(controller.selectedHandIndex, 3);
+  });
+
+  test('selectHandTile ignoriert einen bereits gestagten Hand-Index', () {
+    final game = QwirkleGame(
+      players: [Player(id: 'p1', name: 'Anna')],
+    );
+    final controller = GameController(game);
+    game.currentPlayer.hand = [
+      const Tile(TileColor.red, TileShape.circle),
+      const Tile(TileColor.red, TileShape.cross),
+    ];
+
+    controller.stageTile(0, const Position(0, 0));
+    expect(controller.pendingPlacements, hasLength(1));
+
+    // Index 0 ist bereits platziert - eine Auswahl dafür macht keinen Sinn.
+    controller.selectHandTile(0);
+    expect(controller.selectedHandIndex, isNull);
+  });
+
+  test(
+    'Tap-to-Place: Auswahl + stageTile platziert und leert danach die Auswahl',
+    () {
+      final game = QwirkleGame(
+        players: [Player(id: 'p1', name: 'Anna')],
+      );
+      final controller = GameController(game);
+      game.currentPlayer.hand = [const Tile(TileColor.red, TileShape.circle)];
+
+      controller.selectHandTile(0);
+      expect(controller.selectedHandIndex, 0);
+
+      controller.stageTile(controller.selectedHandIndex!, const Position(0, 0));
+
+      expect(controller.pendingPlacements, hasLength(1));
+      expect(controller.selectedHandIndex, isNull);
+    },
+  );
+
+  test('resetPendingPlacements leert eine aktive Tap-Auswahl', () {
+    final game = QwirkleGame(
+      players: [Player(id: 'p1', name: 'Anna')],
+    );
+    final controller = GameController(game);
+    game.currentPlayer.hand = [const Tile(TileColor.red, TileShape.circle)];
+
+    controller.selectHandTile(0);
+    controller.resetPendingPlacements();
+    expect(controller.selectedHandIndex, isNull);
+  });
+
+  test('passTurn leert eine aktive Tap-Auswahl', () {
+    final game = QwirkleGame(
+      players: [Player(id: 'p1', name: 'Anna')],
+    );
+    final controller = GameController(game);
+    game.currentPlayer.hand = [const Tile(TileColor.red, TileShape.circle)];
+
+    controller.selectHandTile(0);
+    controller.passTurn();
+    expect(controller.selectedHandIndex, isNull);
+  });
+
+  test('confirmMove leert eine aktive Tap-Auswahl', () {
+    final game = QwirkleGame(
+      players: [Player(id: 'p1', name: 'Anna')],
+    );
+    final controller = GameController(game);
+    game.currentPlayer.hand = [const Tile(TileColor.red, TileShape.circle)];
+
+    controller.stageTile(0, const Position(0, 0));
+    // Simuliert eine (in der Praxis unwahrscheinliche) noch aktive Auswahl
+    // zum Zeitpunkt der Bestätigung - `confirmMove` selbst muss sie
+    // ebenfalls leeren, unabhängig davon, ob `stageTile` das schon tut.
+    controller.selectedHandIndex = 0;
+    controller.confirmMove();
+    expect(controller.selectedHandIndex, isNull);
+  });
 }

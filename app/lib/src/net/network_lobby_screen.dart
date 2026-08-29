@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/human_readable_error.dart';
+import '../profile/player_profile.dart';
 import '../settings/app_settings.dart';
 import 'internet_room_history.dart';
 import 'internet_room_screen.dart';
@@ -17,7 +21,7 @@ class NetworkLobbyScreen extends ConsumerStatefulWidget {
 class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
   final _hostController = TextEditingController();
   final _portController = TextEditingController(text: '4040');
-  final _nameController = TextEditingController(text: 'Spieler');
+  final _nameController = TextEditingController();
   String? _errorText;
   final _serverUrlController = TextEditingController(
     text: kDefaultInternetServerUrl,
@@ -34,10 +38,25 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
     'Die Partie beginnt, sobald der Host den Start auslöst.',
   ];
 
+  static const _defaultName = 'Spieler';
+
   @override
   void initState() {
     super.initState();
+    // Deckt den häufigen Fall ab, dass das Profil (siehe player_profile.dart)
+    // bereits geladen ist, wenn dieser Screen betreten wird. Der
+    // Kaltstart-Fall (Profil lädt noch asynchron nach) wird zusätzlich über
+    // `ref.listen` in `build()` abgedeckt.
+    final savedName = ref.read(playerProfileProvider).displayName;
+    _nameController.text = savedName.isNotEmpty ? savedName : _defaultName;
     _loadRecentRooms();
+  }
+
+  void _onNameChanged(String value) {
+    ref
+        .read(playerProfileProvider.notifier)
+        .update(PlayerProfile(displayName: value));
+    unawaited(savePlayerProfile(PlayerProfile(displayName: value)));
   }
 
   Future<void> _loadRecentRooms() async {
@@ -67,6 +86,15 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Fängt den Kaltstart-Fall ab, in dem das Profil erst NACH `initState`
+    // asynchron geladen wird (siehe dortiger Kommentar) - überschreibt das
+    // Feld nur, solange es noch den unveränderten Platzhalter zeigt, damit
+    // ein bereits eingetippter Name nicht verloren geht.
+    ref.listen<PlayerProfile>(playerProfileProvider, (previous, next) {
+      if (next.displayName.isNotEmpty && _nameController.text == _defaultName) {
+        _nameController.text = next.displayName;
+      }
+    });
     final settings = ref.watch(appSettingsProvider);
     final tips = settings.tipsEnabled
         ? _tips
@@ -121,6 +149,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _nameController,
+              onChanged: _onNameChanged,
               decoration: const InputDecoration(
                 labelText: 'Dein Name',
                 border: OutlineInputBorder(),
@@ -321,7 +350,7 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                     ),
                   );
                 } catch (error) {
-                  setState(() => _errorText = error.toString());
+                  setState(() => _errorText = humanReadableError(error));
                 }
               },
               child: Text(_isHosting ? 'Host starten' : 'Beitreten'),

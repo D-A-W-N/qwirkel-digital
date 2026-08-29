@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:qwirkle_core/qwirkle_core.dart';
@@ -211,8 +212,14 @@ class RoomSession {
 
   void _handleLine(RoomSeat seat, String line) {
     _touch();
-    final message = decodeMessage(line);
     try {
+      // Bewusst INNERHALB des try-Blocks (nicht davor): eine kaputte
+      // Nachricht eines bereits verbundenen Sitzplatzes (ungültiges JSON
+      // oder ein Feld mit falschem Typ, siehe `RoomManager._handleFirstLine`
+      // für denselben Fehlerklasse beim Erstkontakt) darf diesen Handler
+      // nicht unbehandelt verlassen - das würde den Isolate mit einem
+      // ungefangenen Fehler statt einer sauberen `ErrorMessage` beenden.
+      final message = decodeMessage(line);
       if (message is StartGameMessage) {
         _requireOwner(seat);
         _startGame();
@@ -266,6 +273,16 @@ class RoomSession {
       // ist bereits lokal geräumt (der Client geht optimistisch von Erfolg
       // aus), aber ohne neuen Spielstand ODER Fehlermeldung sieht es aus,
       // als wären die Steine kommentarlos verschwunden.
+      //
+      // Zusätzlich serverseitig geloggt (nicht nur an den Client
+      // zurückgeschickt): ein unerwarteter Fehlertyp deutet eher auf einen
+      // Bug oder eine kaputte/böswillige Nachricht hin als die drei
+      // spezifischen, erwarteten Fälle oben - ohne dieses Log hätte der
+      // Betrieb keine Möglichkeit zu sehen, dass/wie oft das passiert.
+      stderr.writeln(
+        '[RoomSession $roomCode] Unerwarteter Fehler bei Nachricht von '
+        '${seat.playerId}: $e',
+      );
       seat.send(ErrorMessage('Unerwarteter Fehler: $e'));
     }
   }

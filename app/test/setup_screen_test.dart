@@ -6,72 +6,120 @@ import 'package:qwirkle_digital/src/settings/app_settings.dart';
 
 void main() {
   testWidgets(
+    'Die Spieleranzahl-Buttons haben Tooltips für Screenreader-Nutzer:innen',
+    (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SetupScreen())),
+      );
+
+      final decrement = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.remove_circle_outline),
+      );
+      final increment = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.add_circle_outline),
+      );
+      expect(decrement.tooltip, isNotNull);
+      expect(decrement.tooltip, isNotEmpty);
+      expect(increment.tooltip, isNotNull);
+      expect(increment.tooltip, isNotEmpty);
+    },
+  );
+
+  testWidgets(
     'SetupScreen öffnet die Regeln-&-Hilfe-Seite mit Spielziel und Hausregeln',
     (tester) async {
       await tester.pumpWidget(
         const ProviderScope(child: MaterialApp(home: SetupScreen())),
       );
 
+      // "Regeln & Hilfe" liegt seit der Navigations-Umstrukturierung im
+      // "Mehr"-Tab statt direkt auf dem Hauptbildschirm.
+      await tester.tap(find.text('Mehr'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Regeln & Hilfe'));
       await tester.pumpAndSettle();
 
       expect(find.text('Spielziel'), findsOneWidget);
-      expect(
-        find.text('Bilde Reihen aus Farben oder Formen.'),
-        findsOneWidget,
-      );
+      expect(find.text('Bilde Reihen aus Farben oder Formen.'), findsOneWidget);
       expect(find.text('Hausregeln dieser App'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Startspieler:in'), 200);
       expect(find.text('Startspieler:in'), findsOneWidget);
     },
   );
 
-  testWidgets(
-    'Der Update-Bereich im Einstellungen-Sheet bleibt bei großer '
-    'Systemschrift/kleinem Fenster erreichbar (scrollbar)',
-    (tester) async {
-      // Simuliert die Situation eines sehbehinderten Nutzers mit stark
-      // vergrößerter Systemschrift auf einem eher kleinen Fenster - vorher
-      // war das Sheet nicht scrollbar und der Update-Bereich (weit unten in
-      // der Liste) dadurch weder sichtbar noch antippbar.
-      // Breit genug, damit die (von diesem Fix unabhängigen) horizontalen
-      // Zeilen der Spieler-Konfiguration bei größerer Schrift nicht
-      // überlaufen - schmal in der Höhe ist hier der relevante Engpass.
-      tester.view.physicalSize = const Size(1400, 500);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Der Update-Bereich im Einstellungen-Sheet bleibt bei großer '
+      'Systemschrift/kleinem Fenster erreichbar (scrollbar)', (tester) async {
+    // Simuliert die Situation eines sehbehinderten Nutzers mit stark
+    // vergrößerter Systemschrift auf einem eher kleinen Fenster - vorher
+    // war das Sheet nicht scrollbar und der Update-Bereich (weit unten in
+    // der Liste) dadurch weder sichtbar noch antippbar.
+    // Breit genug, damit die (von diesem Fix unabhängigen) horizontalen
+    // Zeilen der Spieler-Konfiguration bei größerer Schrift nicht
+    // überlaufen - schmal in der Höhe ist hier der relevante Engpass.
+    tester.view.physicalSize = const Size(1400, 500);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: const TextScaler.linear(1.6)),
-              child: child!,
-            ),
-            home: const SetupScreen(),
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.6)),
+            child: child!,
           ),
+          home: const SetupScreen(),
         ),
+      ),
+    );
+
+    // "Einstellungen" liegt seit der Navigations-Umstrukturierung im
+    // "Mehr"-Tab statt direkt auf dem Hauptbildschirm.
+    await tester.tap(find.text('Mehr'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Einstellungen'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Nach Updates suchen'),
+      200,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('settingsSheetScrollView')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(find.text('Nach Updates suchen'), findsOneWidget);
+
+    // Muss auch tatsächlich antippbar sein, nicht nur im Baum vorhanden.
+    await tester.tap(find.text('Nach Updates suchen'));
+    await tester.pump();
+  });
+
+  testWidgets(
+    'Einstellungen-Sheet zeigt einen Design-Umschalter mit System/Hell/Dunkel',
+    (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SetupScreen())),
       );
 
+      // "Einstellungen" liegt seit der Navigations-Umstrukturierung im
+      // "Mehr"-Tab statt direkt auf dem Hauptbildschirm.
+      await tester.tap(find.text('Mehr'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Einstellungen'));
       await tester.pumpAndSettle();
 
-      await tester.scrollUntilVisible(
-        find.text('Nach Updates suchen'),
-        200,
-        scrollable: find.descendant(
-          of: find.byKey(const Key('settingsSheetScrollView')),
-          matching: find.byType(Scrollable),
-        ),
+      expect(find.text('Design'), findsOneWidget);
+      final segmentedButton = tester.widget<SegmentedButton<ThemeMode>>(
+        find.byType(SegmentedButton<ThemeMode>),
       );
-      expect(find.text('Nach Updates suchen'), findsOneWidget);
-
-      // Muss auch tatsächlich antippbar sein, nicht nur im Baum vorhanden.
-      await tester.tap(find.text('Nach Updates suchen'));
-      await tester.pump();
+      expect(
+        segmentedButton.segments.map((s) => s.value),
+        containsAll(ThemeMode.values),
+      );
+      expect(segmentedButton.selected, {ThemeMode.system});
     },
   );
 
@@ -83,50 +131,75 @@ void main() {
     expect(container.read(appSettingsProvider).tipsEnabled, isTrue);
     expect(container.read(appSettingsProvider).updateCheckEnabled, isTrue);
     expect(container.read(appSettingsProvider).botSpeed, BotSpeed.normal);
+    expect(container.read(appSettingsProvider).themeMode, ThemeMode.system);
 
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(animationsEnabled: false);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(tipsEnabled: false);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(updateCheckEnabled: false);
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(botSpeed: BotSpeed.fast);
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(animationsEnabled: false),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container.read(appSettingsProvider).copyWith(tipsEnabled: false),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(updateCheckEnabled: false),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container.read(appSettingsProvider).copyWith(botSpeed: BotSpeed.fast),
+        );
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(themeMode: ThemeMode.dark),
+        );
 
     final settings = container.read(appSettingsProvider);
     expect(settings.animationsEnabled, isFalse);
     expect(settings.tipsEnabled, isFalse);
     expect(settings.updateCheckEnabled, isFalse);
     expect(settings.botSpeed, BotSpeed.fast);
+    expect(settings.themeMode, ThemeMode.dark);
   });
 
   test('App-Settings können auf Standardwerte zurückgesetzt werden', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    container.read(appSettingsProvider.notifier).state = container
-        .read(appSettingsProvider)
-        .copyWith(
-          animationsEnabled: false,
-          tipsEnabled: false,
-          updateCheckEnabled: false,
-          botSpeed: BotSpeed.slow,
+    container
+        .read(appSettingsProvider.notifier)
+        .update(
+          container
+              .read(appSettingsProvider)
+              .copyWith(
+                animationsEnabled: false,
+                tipsEnabled: false,
+                updateCheckEnabled: false,
+                botSpeed: BotSpeed.slow,
+                themeMode: ThemeMode.dark,
+              ),
         );
 
     try {
-      await resetAppSettings(
-        container,
-      );
+      await resetAppSettings(container);
     } catch (error) {
       final settings = container.read(appSettingsProvider);
       expect(settings.animationsEnabled, isTrue);
       expect(settings.tipsEnabled, isTrue);
       expect(settings.updateCheckEnabled, isTrue);
       expect(settings.botSpeed, BotSpeed.normal);
+      expect(settings.themeMode, ThemeMode.system);
       return;
     }
 
@@ -135,5 +208,6 @@ void main() {
     expect(settings.tipsEnabled, isTrue);
     expect(settings.updateCheckEnabled, isTrue);
     expect(settings.botSpeed, BotSpeed.normal);
+    expect(settings.themeMode, ThemeMode.system);
   });
 }

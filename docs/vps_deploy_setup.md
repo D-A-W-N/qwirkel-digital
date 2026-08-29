@@ -65,9 +65,73 @@ unabhängig von Coolify).
 Health-Check danach: `https://qgames.streetkidz.duckdns.org/health` sollte
 `ok` liefern.
 
+## Firewall-Verifikation (Port 8080)
+
+Die `docker-compose.yml` deklariert Port 8080 bewusst über `expose` statt
+`ports` - Docker veröffentlicht ihn dadurch gar nicht erst auf einer
+Host-Netzwerkschnittstelle, erreichbar ist er nur innerhalb des
+Docker-Netzwerks (also für Traefik, das Coolify selbst davorsetzt). Das ist
+bereits die wirksamste Schutzschicht, unabhängig von jeder Firewall-Regel.
+Zusätzlich (Verteidigung in der Tiefe) einmalig nach dem Setup und nach
+jeder Änderung an Firewall/Compose-Datei prüfen:
+
+1. **Von außerhalb der VPS** (z. B. vom eigenen Rechner):
+
+   ```sh
+   curl -m 5 http://<VPS-IP>:8080/health
+   ```
+
+   Erwartet: Timeout oder „Connection refused" - jede Antwort (insb. `ok`)
+   bedeutet, dass 8080 direkt erreichbar ist und TLS/Traefik umgangen
+   werden kann. In dem Fall: Compose-Datei erneut prüfen (`expose` statt
+   `ports`?) und ob eine Cloud-Firewall den Port versehentlich freigibt.
+2. **Hetzner Cloud Firewall** (Hetzner-Konsole → Firewalls, getrennt von
+   jeder Firewall auf der VM selbst): nur eingehend 22/tcp (SSH), 80/tcp,
+   443/tcp erlauben. Keine Regel für 8080 (oder einen anderen internen
+   Port) anlegen.
+3. **Firewall auf der VM selbst**, falls zusätzlich zur Hetzner Cloud
+   Firewall aktiv (z. B. `ufw`):
+
+   ```sh
+   sudo ufw status verbose
+   ```
+
+   Sollte ausschließlich 22/tcp, 80/tcp, 443/tcp auflisten - kein Eintrag
+   für 8080.
+
+## Backup-Strategie
+
+Laufende Partien liegen als JSON-Dateien unter `/data/rooms/` im
+konfigurierten Volume (`qwirkle_data`). Der Einsatz ist bewusst
+risikoarm eingestuft: Rauminhalte sind reine Spielzustände (keine
+Nutzerkonten/personenbezogenen Daten) und Räume ohne Aktivität verfallen
+ohnehin nach `ROOM_RETENTION_DAYS` (Default 14 Tage) - im schlimmsten Fall
+müssten Mitspieler:innen eine verlorene Partie neu starten. Ein volles
+Enterprise-Backup-Konzept ist dafür nicht nötig, ein einfaches
+regelmäßiges Snapshot reicht:
+
+1. **Bevorzugt**: falls die genutzte Coolify-Version eine eingebaute
+   Volume-/Scheduled-Backup-Funktion anbietet (Application → Backups bzw.
+   Storage), diese für das `qwirkle_data`-Volume aktivieren - das deckt
+   Speicherort, Zeitplan und Rotation ab, ohne zusätzliche Infrastruktur.
+2. **Fallback**, falls nicht verfügbar: ein periodischer Cronjob auf der
+   VPS (oder Coolifys "Scheduled Task", falls es beliebige Befehle
+   unterstützt), der das Volume komprimiert außerhalb des Volumes selbst
+   ablegt, z. B.:
+
+   ```sh
+   docker run --rm -v qwirkle_data:/data -v /root/backups:/backup \
+     alpine tar czf /backup/qwirkle-data-$(date +%F).tar.gz /data
+   ```
+
+   Aufbewahrung: z. B. die letzten 7 Tage reichen aus - länger als die
+   `ROOM_RETENTION_DAYS`-Frist aufzubewahren bringt keinen Mehrwert, da
+   abgelaufene Räume ohnehin nicht mehr gültig sind.
+3. Wichtig: die Backups **nicht** ausschließlich auf derselben VPS
+   belassen (z. B. periodisch auf ein separates Object-Storage-Bucket oder
+   den eigenen Rechner herunterladen) - sonst schützt das Backup nicht vor
+   einem Totalausfall/Datenverlust der VPS selbst.
+
 ## Wartung
 
-- Laufende Partien liegen als JSON-Dateien in `/data/rooms/` im
-  konfigurierten Volume - bei Bedarf über Coolifys eigene
-  Backup-/Volume-Funktionen sichern.
 - Server-Logs sind über die Coolify-UI (Application → Logs) einsehbar.

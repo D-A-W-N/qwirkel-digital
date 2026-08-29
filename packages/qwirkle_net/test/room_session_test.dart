@@ -125,6 +125,63 @@ void main() {
     );
 
     test(
+      'Eine kaputte Erstnachricht (fehlendes Pflichtfeld) legt weder den '
+      'Manager noch den Server lahm',
+      () async {
+        // Regression: `RoomManager._handleFirstLine` fing nur
+        // `FormatException` (kaputtes JSON) ab - ein strukturell gültiges
+        // JSON mit fehlendem/falsch typisiertem Pflichtfeld wirft beim
+        // Decodieren stattdessen einen `TypeError` (`null as String` in
+        // `JoinMessage.fromJson`), der unbehandelt aus dem
+        // `transport.lines.listen`-Callback ausgebrochen wäre.
+        final socket = await WebSocket.connect('ws://127.0.0.1:$port');
+        final transport = WebSocketTransport(socket);
+        transport.send('{"type":"join"}');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        final anna = await _connect(port, name: 'Anna');
+        addTearDown(anna.close);
+        expect(anna.roomCode, isNotNull);
+
+        await transport.close();
+      },
+    );
+
+    test(
+      'Eine kaputte Folgenachricht eines bereits verbundenen Sitzplatzes '
+      'bekommt eine Fehlermeldung, statt Verbindung/Raum zu zerstören',
+      () async {
+        // Regression: `RoomSession._handleLine` rief `decodeMessage`
+        // AUSSERHALB des try-Blocks auf - dieselbe Fehlerklasse wie oben,
+        // hier aber von einer bereits etablierten Verbindung, hätte den
+        // gesamten Raum (und potenziell den Prozess) mitgerissen.
+        final socket = await WebSocket.connect('ws://127.0.0.1:$port');
+        final rawTransport = WebSocketTransport(socket);
+        final rawLines = <String>[];
+        rawTransport.lines.listen(rawLines.add);
+        rawTransport.send(JoinMessage('Anna').encode());
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        addTearDown(rawTransport.close);
+
+        expect(rawLines, isNotEmpty);
+        final roomCode = (decodeMessage(rawLines.first) as WelcomeMessage)
+            .roomCode!;
+
+        // "move" ohne das Pflichtfeld "placements" - wirft beim Decodieren
+        // einen TypeError, nicht erst in der Spiellogik.
+        rawTransport.send('{"type":"move"}');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(rawLines.any((line) => line.contains('"error"')), isTrue);
+
+        // Der Raum lebt weiter: ein weiterer, normaler Beitritt funktioniert.
+        final ben = await _connect(port, name: 'Ben', roomCode: roomCode);
+        addTearDown(ben.close);
+        expect(ben.roomCode, roomCode);
+      },
+    );
+
+    test(
       'Unbekannter Raum-Code liefert einen Fehler statt einer Verbindung',
       () async {
         final socket = await WebSocket.connect('ws://127.0.0.1:$port');

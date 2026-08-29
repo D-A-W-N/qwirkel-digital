@@ -2,6 +2,7 @@
 /// Startspieler-Ermittlung und Spiel-Engine. Unabhängig von Flutter/UI.
 library;
 
+export 'src/anchors.dart';
 export 'src/board.dart';
 export 'src/bot.dart';
 export 'src/game.dart';

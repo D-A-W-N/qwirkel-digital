@@ -29,6 +29,11 @@ class BoardView extends ConsumerWidget {
       cellSize: cellSize,
       tileSize: tileSize,
       highlightedPositions: controller.lastBotPlacements,
+      hasSelection: controller.selectedHandIndex != null,
+      onTapEmptyCell: (position) {
+        final index = controller.selectedHandIndex;
+        if (index != null) controller.stageTile(index, position);
+      },
     );
   }
 }

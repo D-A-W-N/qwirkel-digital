@@ -19,7 +19,12 @@ Color colorForTileColor(TileColor color) {
   }
 }
 
-/// Zeichnet einen Qwirkle-Stein: dunkler Hintergrund mit dem Symbol in seiner Farbe.
+/// Zeichnet einen Qwirkle-Stein: Hintergrund aus dem App-Theme (siehe
+/// `ColorScheme.surfaceContainerHighest`/`outlineVariant`, dieselben Rollen,
+/// die auch `board_surface.dart` für die Zellen-Umrandung nutzt) mit dem
+/// Symbol in seiner Farbe. Reagierte vorher gar nicht auf Hell-/Dunkelmodus
+/// (hartcodierter fast-schwarzer Hintergrund) - sah dadurch in beiden Modi
+/// identisch statt zum jeweiligen Theme passend aus.
 class TileView extends StatelessWidget {
   final Tile tile;
   final double size;
@@ -36,16 +41,17 @@ class TileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: size,
       height: size,
       margin: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFF222222),
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(size * 0.15),
         border: highlighted
             ? Border.all(color: highlightColor, width: 3)
-            : Border.all(color: Colors.black54, width: 1),
+            : Border.all(color: colorScheme.outlineVariant, width: 1),
         // Ein zusätzlicher Glow macht die Hervorhebung auch bei kleiner
         // Kachelgröße/auf dem Handy klar erkennbar, statt sich nur auf die
         // (dort kaum wahrnehmbare) Randfarbe zu verlassen - Nutzer-Feedback:

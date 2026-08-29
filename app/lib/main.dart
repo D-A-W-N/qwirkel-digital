@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'src/net/internet_room_screen.dart';
 import 'src/net/room_connection_manager.dart';
 import 'src/onboarding/startup_gate.dart';
+import 'src/profile/player_profile.dart';
 import 'src/settings/app_settings.dart';
 
 void main() {
@@ -35,6 +36,7 @@ class _QwirkleAppState extends ConsumerState<QwirkleApp> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await initializeAppSettings(ref);
+      await initializePlayerProfile(ref);
     });
     _listenForTurnNotifications();
   }
@@ -58,7 +60,8 @@ class _QwirkleAppState extends ConsumerState<QwirkleApp> {
             label: 'Öffnen',
             onPressed: () => navigatorKey.currentState?.push(
               MaterialPageRoute(
-                builder: (_) => InternetRoomScreen.existingRoom(roomCode: roomCode),
+                builder: (_) =>
+                    InternetRoomScreen.existingRoom(roomCode: roomCode),
               ),
             ),
           ),
@@ -76,6 +79,9 @@ class _QwirkleAppState extends ConsumerState<QwirkleApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(
+      appSettingsProvider.select((settings) => settings.themeMode),
+    );
     return MaterialApp(
       title: 'Qwirkle Digital',
       debugShowCheckedModeBanner: false,
@@ -85,6 +91,14 @@ class _QwirkleAppState extends ConsumerState<QwirkleApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: themeMode,
       home: const StartupGate(),
     );
   }
