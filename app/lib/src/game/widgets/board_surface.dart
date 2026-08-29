@@ -41,10 +41,8 @@ class BoardSurface extends StatelessWidget {
     // Bounding Box, damit sich der sichtbare Bereich schon während des
     // eigenen Zugs erweitert, statt erst nach dem nächsten bestätigten
     // Spielstand.
-    final positions = [...board.keys, ...pendingPlacements.keys];
-    if (positions.isEmpty) {
-      positions.add(const Position(0, 0));
-    }
+    final occupied = {...board.keys, ...pendingPlacements.keys};
+    final positions = occupied.isEmpty ? {const Position(0, 0)} : occupied;
 
     var minX = positions.first.x;
     var maxX = positions.first.x;
@@ -58,17 +56,20 @@ class BoardSurface extends StatelessWidget {
       maxY = maxY > position.y ? maxY : position.y;
     }
 
-    minX -= 2;
-    maxX += 2;
-    minY -= 2;
-    maxY += 2;
-
-    final boardPositions = <Position>[];
-    for (var x = minX; x <= maxX; x++) {
-      for (var y = minY; y <= maxY; y++) {
-        boardPositions.add(Position(x, y));
-      }
-    }
+    // Statt eines vollen Rechtecks über die Bounding Box (mit ±2 Feldern
+    // Rand) nur tatsächlich belegte Felder plus zwei "Ringe" freier
+    // Nachbarfelder rendern: Ring 1 sind die einzigen Felder, an denen
+    // überhaupt legal neu angelegt werden kann (siehe `anchorPositions` -
+    // dieselbe Definition, die auch der Bot für seine Zuggenerierung
+    // verwendet), Ring 2 ist rein kosmetischer Rand darum. Bei weit
+    // auseinandergezogenen Zügen (z. B. Brücken-Züge über ein bestehendes
+    // Feld hinweg) wuchs die alte Rechteck-Fläche quadratisch mit dem
+    // Abstand zwischen den Clustern, obwohl der leere Raum dazwischen nie
+    // interaktiv war - je nach Boardform potenziell hunderte nutzlose
+    // Drop-Ziele pro Frame.
+    final ring1 = anchorPositions(occupied);
+    final ring2 = anchorPositions({...occupied, ...ring1});
+    final boardPositions = {...occupied, ...ring1, ...ring2};
 
     final geometry = BoardGeometry(cellSize);
 
