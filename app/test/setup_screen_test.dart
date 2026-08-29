@@ -5,17 +5,26 @@ import 'package:qwirkle_digital/src/setup/setup_screen.dart';
 import 'package:qwirkle_digital/src/settings/app_settings.dart';
 
 void main() {
-  testWidgets('SetupScreen zeigt die Anleitung im Dialog an', (tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: SetupScreen())),
-    );
+  testWidgets(
+    'SetupScreen öffnet die Regeln-&-Hilfe-Seite mit Spielziel und Hausregeln',
+    (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: SetupScreen())),
+      );
 
-    await tester.tap(find.text('Anleitung'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Regeln & Hilfe'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Spielziel'), findsOneWidget);
-    expect(find.text('Bilde Reihen aus Farben oder Formen.'), findsOneWidget);
-  });
+      expect(find.text('Spielziel'), findsOneWidget);
+      expect(
+        find.text('Bilde Reihen aus Farben oder Formen.'),
+        findsOneWidget,
+      );
+      expect(find.text('Hausregeln dieser App'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Startspieler:in'), 200);
+      expect(find.text('Startspieler:in'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'Der Update-Bereich im Einstellungen-Sheet bleibt bei großer '
