@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'internet_room_history.dart';
@@ -113,6 +114,19 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
     super.dispose();
   }
 
+  Future<void> _copyRoomCode(BuildContext context, String roomCode) async {
+    await Clipboard.setData(ClipboardData(text: roomCode));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Einladungscode kopiert'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
   Future<void> _confirmLeaveRoom(BuildContext context, String roomCode) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -210,6 +224,11 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
                 leading: const Icon(Icons.vpn_key),
                 title: const Text('Einladungscode'),
                 subtitle: SelectableText(roomCode),
+                trailing: IconButton(
+                  icon: const Icon(Icons.copy),
+                  tooltip: 'Code kopieren',
+                  onPressed: () => _copyRoomCode(context, roomCode),
+                ),
               ),
             ),
             const SizedBox(height: 12),
