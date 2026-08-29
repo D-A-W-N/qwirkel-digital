@@ -199,6 +199,48 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Design',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            SegmentedButton<ThemeMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: ThemeMode.system,
+                                  label: Text('System'),
+                                  icon: Icon(Icons.brightness_auto),
+                                ),
+                                ButtonSegment(
+                                  value: ThemeMode.light,
+                                  label: Text('Hell'),
+                                  icon: Icon(Icons.light_mode),
+                                ),
+                                ButtonSegment(
+                                  value: ThemeMode.dark,
+                                  label: Text('Dunkel'),
+                                  icon: Icon(Icons.dark_mode),
+                                ),
+                              ],
+                              selected: {settings.themeMode},
+                              onSelectionChanged: (selection) async {
+                                final nextSettings = ref
+                                    .read(appSettingsProvider)
+                                    .copyWith(themeMode: selection.first);
+                                ref.read(appSettingsProvider.notifier).state =
+                                    nextSettings;
+                                await saveAppSettings(nextSettings);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       const UpdateSettingsSection(),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -212,7 +254,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                   'Einstellungen zurücksetzen?',
                                 ),
                                 content: const Text(
-                                  'Damit werden Animationen, Tipps und Bot-Geschwindigkeit auf die Standardwerte zurückgesetzt.',
+                                  'Damit werden Animationen, Tipps, Bot-Geschwindigkeit und Design auf die Standardwerte zurückgesetzt.',
                                 ),
                                 actions: [
                                   TextButton(

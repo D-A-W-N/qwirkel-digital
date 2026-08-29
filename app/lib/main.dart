@@ -76,6 +76,9 @@ class _QwirkleAppState extends ConsumerState<QwirkleApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(
+      appSettingsProvider.select((settings) => settings.themeMode),
+    );
     return MaterialApp(
       title: 'Qwirkle Digital',
       debugShowCheckedModeBanner: false,
@@ -85,6 +88,14 @@ class _QwirkleAppState extends ConsumerState<QwirkleApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: themeMode,
       home: const StartupGate(),
     );
   }

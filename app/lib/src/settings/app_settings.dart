@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +29,7 @@ class AppSettings {
     required this.tipsEnabled,
     required this.updateCheckEnabled,
     required this.botSpeed,
+    required this.themeMode,
   });
 
   final bool animationsEnabled;
@@ -35,17 +37,23 @@ class AppSettings {
   final bool updateCheckEnabled;
   final BotSpeed botSpeed;
 
+  /// `system` (Standard) folgt der Geräteeinstellung; `light`/`dark`
+  /// erzwingen ein festes Erscheinungsbild unabhängig davon.
+  final ThemeMode themeMode;
+
   AppSettings copyWith({
     bool? animationsEnabled,
     bool? tipsEnabled,
     bool? updateCheckEnabled,
     BotSpeed? botSpeed,
+    ThemeMode? themeMode,
   }) {
     return AppSettings(
       animationsEnabled: animationsEnabled ?? this.animationsEnabled,
       tipsEnabled: tipsEnabled ?? this.tipsEnabled,
       updateCheckEnabled: updateCheckEnabled ?? this.updateCheckEnabled,
       botSpeed: botSpeed ?? this.botSpeed,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -55,6 +63,7 @@ class AppSettings {
       tipsEnabled: true,
       updateCheckEnabled: true,
       botSpeed: BotSpeed.normal,
+      themeMode: ThemeMode.system,
     );
   }
 }
@@ -73,12 +82,17 @@ Future<void> initializeAppSettings(WidgetRef ref) async {
       (speed) => speed.name == prefs.getString('botSpeed'),
       orElse: () => BotSpeed.normal,
     ),
+    themeMode: ThemeMode.values.firstWhere(
+      (mode) => mode.name == prefs.getString('themeMode'),
+      orElse: () => ThemeMode.system,
+    ),
   );
   final current = ref.read(appSettingsProvider);
   if (current.animationsEnabled != settings.animationsEnabled ||
       current.tipsEnabled != settings.tipsEnabled ||
       current.updateCheckEnabled != settings.updateCheckEnabled ||
-      current.botSpeed != settings.botSpeed) {
+      current.botSpeed != settings.botSpeed ||
+      current.themeMode != settings.themeMode) {
     ref.read(appSettingsProvider.notifier).state = settings;
   }
 }
@@ -89,6 +103,7 @@ Future<void> saveAppSettings(AppSettings settings) async {
   await prefs.setBool('tipsEnabled', settings.tipsEnabled);
   await prefs.setBool('updateCheckEnabled', settings.updateCheckEnabled);
   await prefs.setString('botSpeed', settings.botSpeed.name);
+  await prefs.setString('themeMode', settings.themeMode.name);
 }
 
 Future<void> resetAppSettings(dynamic ref) async {
