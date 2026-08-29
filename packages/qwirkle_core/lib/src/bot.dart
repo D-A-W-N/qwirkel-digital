@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'anchors.dart';
 import 'board.dart';
 import 'game.dart';
 import 'invalid_move_exception.dart';
@@ -302,20 +303,7 @@ class Bot {
   }
 
   Set<Position> _findAnchors(Board board) {
-    if (board.isEmpty) return {const Position(0, 0)};
-    final anchors = <Position>{};
-    for (final position in board.cells.keys) {
-      for (final direction in _directions) {
-        final neighbor = Position(
-          position.x + direction.$1,
-          position.y + direction.$2,
-        );
-        if (board.tileAt(neighbor) == null) {
-          anchors.add(neighbor);
-        }
-      }
-    }
-    return anchors;
+    return anchorPositions(board.cells.keys);
   }
 
   int? _tryScore(Board board, List<TilePlacement> placements) {
