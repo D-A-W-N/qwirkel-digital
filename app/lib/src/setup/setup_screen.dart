@@ -333,16 +333,24 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                 ? () => setState(() => _playerCount--)
                                 : null,
                             icon: const Icon(Icons.remove_circle_outline),
+                            tooltip: 'Einen Spieler entfernen',
                           ),
-                          Text(
-                            '$_playerCount',
-                            style: Theme.of(context).textTheme.headlineSmall,
+                          Semantics(
+                            label: 'Anzahl Spieler',
+                            value: '$_playerCount',
+                            child: ExcludeSemantics(
+                              child: Text(
+                                '$_playerCount',
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
+                            ),
                           ),
                           IconButton(
                             onPressed: _playerCount < maxPlayers
                                 ? () => setState(() => _playerCount++)
                                 : null,
                             icon: const Icon(Icons.add_circle_outline),
+                            tooltip: 'Einen Spieler hinzufügen',
                           ),
                         ],
                       ),
