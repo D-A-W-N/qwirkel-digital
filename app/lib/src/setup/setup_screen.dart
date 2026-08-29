@@ -8,6 +8,7 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import '../game/game_controller.dart';
 import '../game/game_providers.dart';
 import '../game/game_screen.dart';
+import '../history/match_history_screen.dart';
 import '../net/my_rooms_screen.dart';
 import '../net/network_lobby_screen.dart';
 import '../onboarding/rules_screen.dart';
@@ -476,6 +477,20 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                                     ),
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const MatchHistoryScreen(),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.history),
+                                  label: const Text('Partie-Historie'),
+                                ),
                               ),
                             ],
                           ),

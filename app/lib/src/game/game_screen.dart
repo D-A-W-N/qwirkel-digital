@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qwirkle_core/qwirkle_core.dart';
 
+import '../history/match_history.dart';
 import '../settings/app_settings.dart';
 import 'game_controller.dart';
 import 'game_providers.dart';
@@ -49,6 +50,20 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     if (game.isOver && !_gameOverShown) {
       _gameOverShown = true;
+      unawaited(
+        recordMatch(
+          MatchRecord(
+            playedAt: DateTime.now(),
+            mode: MatchMode.local,
+            standings: [
+              for (final player in [
+                ...game.players,
+              ]..sort((a, b) => b.score.compareTo(a.score)))
+                MatchPlayerResult(name: player.name, score: player.score),
+            ],
+          ),
+        ),
+      );
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _showGameOverDialog(context, game),
       );
