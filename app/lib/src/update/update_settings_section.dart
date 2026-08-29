@@ -30,7 +30,7 @@ class UpdateSettingsSection extends ConsumerWidget {
             final nextSettings = ref
                 .read(appSettingsProvider)
                 .copyWith(updateCheckEnabled: value);
-            ref.read(appSettingsProvider.notifier).state = nextSettings;
+            ref.read(appSettingsProvider.notifier).update(nextSettings);
             await saveAppSettings(nextSettings);
           },
           title: const Text('Automatisch nach Updates suchen'),
