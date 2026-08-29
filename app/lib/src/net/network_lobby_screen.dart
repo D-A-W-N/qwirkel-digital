@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/app_settings.dart';
 import 'internet_room_history.dart';
+import 'internet_room_screen.dart';
 import 'network_connection_config.dart';
 import 'network_game_screen.dart';
 
@@ -314,7 +315,9 @@ class _NetworkLobbyScreenState extends ConsumerState<NetworkLobbyScreen> {
                   setState(() => _errorText = null);
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => NetworkGameScreen(config: config),
+                      builder: (_) => config.mode == 'internet'
+                          ? InternetRoomScreen(config: config)
+                          : NetworkGameScreen(config: config),
                     ),
                   );
                 } catch (error) {

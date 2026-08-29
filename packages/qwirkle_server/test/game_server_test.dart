@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:qwirkle_net/qwirkle_net.dart';
@@ -61,6 +62,51 @@ void main() {
 
       expect(snapshot.players.length, 2);
     });
+
+    test(
+      'Ein vor Spielstart leergelaufener Raum kann nicht gekapert werden',
+      () async {
+        // Regression: verließ die/der einzige Person einen Raum vor
+        // Spielstart, blieb er als leerer RoomSession-Eintrag bestehen -
+        // eine unbeteiligte Person, die denselben Code später verwendete,
+        // wurde automatisch dessen neue:r Owner:in (`isOwner: seats.isEmpty`).
+        final server = GameServer(dataDir: dataDir);
+        await server.start(address: '127.0.0.1', port: 0);
+        addTearDown(server.close);
+
+        final anna = await _connect(server.port, name: 'Anna');
+        final roomCode = anna.roomCode!;
+        expect(server.manager.room(roomCode), isNotNull);
+
+        await anna.close();
+        // Der Trennungs-Handler läuft asynchron über den Stream - kurz
+        // nachgeben, damit er sicher durchgelaufen ist.
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(
+          server.manager.room(roomCode),
+          isNull,
+          reason: 'Der leere Raum sollte sofort entfernt worden sein.',
+        );
+
+        final socket = await WebSocket.connect('ws://127.0.0.1:${server.port}');
+        final intruder = ClientSession();
+        addTearDown(intruder.close);
+        final errorFuture = intruder.errors.first;
+        unawaited(
+          intruder
+              .connectVia(
+                WebSocketTransport(socket),
+                name: 'Unbeteiligt',
+                roomCode: roomCode,
+              )
+              .catchError((_) {}),
+        );
+
+        final error = await errorFuture;
+        expect(error, contains('Unbekannter'));
+      },
+    );
 
     test(
       'Ein neu persistierter Raum überlebt einen Server-Neustart (Redeploy-Szenario)',
