@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.9.21] - 2026-08-29
+
+- Fixed a crash ("Concurrent modification during iteration") in the internet server backend when a room with two or more still-connected, pre-game seats was torn down (e.g. during a redeploy) - closing each seat's connection could trigger another seat's disconnect handler to remove itself from the same list being iterated over
+
 ## [0.9.20] - 2026-08-29
 
 - Bots now generate "bridging" moves - placing tiles on both sides of an already-occupied tile within the same line - which they previously never considered even though the rules already allowed it; this was likely the biggest reason bots looked weak even on "Hard". "Hard" also replaces its old flat penalty for open 5-tile lines with a proportional 1-ply estimate of what an opponent could score from any line a move leaves open
