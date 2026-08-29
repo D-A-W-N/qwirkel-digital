@@ -10,6 +10,11 @@ void main() {
       const ProviderScope(child: MaterialApp(home: SetupScreen())),
     );
 
+    // "Netzwerk spielen" liegt seit der Navigations-Umstrukturierung im
+    // "Online"-Tab statt direkt auf dem Hauptbildschirm.
+    await tester.tap(find.text('Online'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Netzwerk spielen'), findsOneWidget);
   });
 }

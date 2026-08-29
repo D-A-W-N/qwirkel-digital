@@ -32,6 +32,10 @@ void main() {
         const ProviderScope(child: MaterialApp(home: SetupScreen())),
       );
 
+      // "Regeln & Hilfe" liegt seit der Navigations-Umstrukturierung im
+      // "Mehr"-Tab statt direkt auf dem Hauptbildschirm.
+      await tester.tap(find.text('Mehr'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Regeln & Hilfe'));
       await tester.pumpAndSettle();
 
@@ -71,6 +75,10 @@ void main() {
       ),
     );
 
+    // "Einstellungen" liegt seit der Navigations-Umstrukturierung im
+    // "Mehr"-Tab statt direkt auf dem Hauptbildschirm.
+    await tester.tap(find.text('Mehr'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Einstellungen'));
     await tester.pumpAndSettle();
 
@@ -96,6 +104,10 @@ void main() {
         const ProviderScope(child: MaterialApp(home: SetupScreen())),
       );
 
+      // "Einstellungen" liegt seit der Navigations-Umstrukturierung im
+      // "Mehr"-Tab statt direkt auf dem Hauptbildschirm.
+      await tester.tap(find.text('Mehr'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Einstellungen'));
       await tester.pumpAndSettle();
 
