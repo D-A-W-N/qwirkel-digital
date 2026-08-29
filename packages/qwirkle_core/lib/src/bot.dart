@@ -15,8 +15,9 @@ enum BotDifficulty {
   /// Wählt den Zug mit dem höchsten unmittelbaren Punktwert.
   medium,
 
-  /// Wie [medium], bevorzugt bei ähnlich guten Zügen aber Züge, die keine
-  /// offene 5er-Reihe für den Gegner hinterlassen ("Lookahead-Heuristik").
+  /// Wie [medium], zieht aber von jedem Kandidaten ab, wie viele Punkte ein
+  /// Gegner aus den dadurch entstandenen offenen Reihen herausholen könnte,
+  /// wenn er einen passenden Stein hätte ("Lookahead-Heuristik").
   hard,
 }
 
@@ -120,8 +121,8 @@ class Bot {
     var bestValue = -1 << 30;
     final bestOnes = <_Candidate>[];
     for (final candidate in candidates) {
-      final penalty = _openLinePenalty(board, candidate.placements);
-      final value = candidate.score - penalty * 3;
+      final exploit = _opponentExploitPotential(board, candidate.placements);
+      final value = candidate.score - exploit;
       if (value > bestValue) {
         bestValue = value;
         bestOnes
@@ -134,16 +135,19 @@ class Bot {
     return bestOnes[_random.nextInt(bestOnes.length)];
   }
 
-  /// Zählt Reihen, die durch [placements] auf genau 5 Steine wachsen (und
-  /// damit dem Gegner eine leichte Qwirkle-Vervollständigung ermöglichen).
-  int _openLinePenalty(Board board, List<TilePlacement> placements) {
+  /// 1-Ply-Lookahead ohne Kenntnis der tatsächlichen Gegnerhand: schätzt für
+  /// jede durch [placements] berührte Reihe ab, wie viele Punkte ein Gegner
+  /// mit einem einzigen, ideal passenden Stein aus ihr herausholen könnte
+  /// (Reihe der Länge 5 -> Qwirkle-Bonus möglich, deshalb am teuersten
+  /// gewichtet; kürzere offene Reihen zählen anteilig weniger).
+  int _opponentExploitPotential(Board board, List<TilePlacement> placements) {
     final merged = Map<Position, Tile>.from(board.cells);
     for (final placement in placements) {
       merged[placement.position] = placement.tile;
     }
 
     final visitedLines = <String>{};
-    var penalty = 0;
+    var potential = 0;
     for (final placement in placements) {
       for (final axisIndex in [0, 1]) {
         final dx = axisIndex == 0 ? 1 : 0;
@@ -162,10 +166,14 @@ class Bot {
           length++;
           current = Position(current.x + dx, current.y + dy);
         }
-        if (length == 5) penalty++;
+        // Eine isolierte Reihe (Länge 1) oder eine bereits volle Reihe
+        // (Länge 6) lässt sich durch einen einzelnen Gegnerstein nicht mehr
+        // sinnvoll bzw. gar nicht mehr erweitern.
+        if (length < 2 || length >= 6) continue;
+        potential += length == 5 ? 12 : (length + 1);
       }
     }
-    return penalty;
+    return potential;
   }
 
   List<_Candidate> _generateCandidates(Board board, List<Tile> hand) {
@@ -224,11 +232,27 @@ class Bot {
       results.add(_LineCandidate(trial, dx, dy, score));
 
       final nextPosition = Position(position.x + dx, position.y + dy);
-      if (board.tileAt(nextPosition) == null) {
-        final nextHand = List<Tile>.from(remainingHand)..removeAt(i);
-        _extendLine(board, nextHand, nextPosition, dx, dy, trial, results);
-      }
+      final continuation = board.tileAt(nextPosition) == null
+          ? nextPosition
+          // Brücken-Zug: liegt bereits ein Stein im Weg, überspringt die
+          // Suche ihn (und jeden weiteren zusammenhängenden Stein) und legt
+          // dahinter weiter an derselben Reihe an - laut Hausregel gelten
+          // neue Steine auf beiden Seiten eines vorhandenen Steins als
+          // verbunden (siehe Board._areOrthogonallyConnected).
+          : _skipOccupiedRun(board, nextPosition, dx, dy);
+      final nextHand = List<Tile>.from(remainingHand)..removeAt(i);
+      _extendLine(board, nextHand, continuation, dx, dy, trial, results);
     }
+  }
+
+  /// Läuft von [position] aus in Richtung ([dx], [dy]) über bereits belegte
+  /// Felder hinweg und liefert die erste wieder freie Position dahinter.
+  Position _skipOccupiedRun(Board board, Position position, int dx, int dy) {
+    var current = position;
+    while (board.tileAt(current) != null) {
+      current = Position(current.x + dx, current.y + dy);
+    }
+    return current;
   }
 
   /// Verzweigt von jedem Stein einer geraden Reihe [line] rechtwinklig ab

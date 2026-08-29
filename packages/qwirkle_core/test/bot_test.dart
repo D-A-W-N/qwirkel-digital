@@ -122,6 +122,98 @@ void main() {
       },
     );
 
+    test(
+      'medium: erkennt Brücken-Züge (neue Steine auf beiden Seiten eines '
+      'vorhandenen Steins in einer Reihe)',
+      () {
+        final anna = Player(id: 'a', name: 'Anna');
+        final ben = Player(id: 'b', name: 'Ben');
+        final game = QwirkleGame(players: [anna, ben], bag: TileBag.standard());
+        game.currentPlayerIndex = 0;
+
+        anna.hand = [const Tile(TileColor.red, TileShape.circle)];
+        game.playTiles([
+          const TilePlacement(
+            position: Position(2, 0),
+            tile: Tile(TileColor.red, TileShape.circle),
+          ),
+        ]);
+
+        // Zwei Steine, die nur als gemeinsamer Brücken-Zug (je einer auf
+        // jeder Seite des vorhandenen Steins bei (2,0)) ihren vollen Wert
+        // entfalten: einzeln gespielt käme keiner über 2 Punkte, gemeinsam
+        // ergibt die entstehende Dreier-Reihe 2+3=5 Punkte (Hausregel:
+        // jeder Stein zählt einzeln nach Reihenlänge zum Anlagezeitpunkt).
+        game.currentPlayerIndex = 0;
+        anna.hand = [
+          const Tile(TileColor.red, TileShape.cross),
+          const Tile(TileColor.red, TileShape.diamond),
+        ];
+
+        final bot = Bot(difficulty: BotDifficulty.medium);
+        final decision = bot.decide(game);
+
+        expect(decision.isPlay, isTrue);
+        expect(decision.placements!.length, 2);
+        final score = decision.applyTo(game);
+        expect(score, 5);
+      },
+    );
+
+    test(
+      'hard: vermeidet einen Zug, der eine offene 5er-Reihe hinterlässt, '
+      'wenn eine sicherere Alternative mit besserem Netto-Wert existiert',
+      () {
+        final anna = Player(id: 'a', name: 'Anna');
+        final ben = Player(id: 'b', name: 'Ben');
+        final game = QwirkleGame(players: [anna, ben], bag: TileBag.standard());
+
+        void place(Position position, Tile tile) {
+          game.currentPlayerIndex = 0;
+          anna.hand = [tile];
+          game.playTiles([TilePlacement(position: position, tile: tile)]);
+        }
+
+        // Reihe aus 4 roten Steinen (unterschiedliche Symbole) - eine
+        // Erweiterung auf 5 wäre für den Bot zwar der punktereichste
+        // Einzelzug, hinterließe aber eine für den Gegner leicht zum
+        // Qwirkle vervollständigbare Reihe.
+        place(const Position(0, 0), const Tile(TileColor.red, TileShape.circle));
+        place(const Position(1, 0), const Tile(TileColor.red, TileShape.cross));
+        place(const Position(2, 0), const Tile(TileColor.red, TileShape.diamond));
+        place(const Position(3, 0), const Tile(TileColor.red, TileShape.square));
+        // Zusätzlicher Anker für eine sichere Alternative ohne Bezug zur
+        // gefährlichen Reihe.
+        place(const Position(1, 1), const Tile(TileColor.blue, TileShape.cross));
+
+        game.currentPlayerIndex = 0;
+        anna.hand = [
+          const Tile(TileColor.red, TileShape.star), // verlängert auf 5
+          const Tile(TileColor.blue, TileShape.clover), // sichere Alternative
+        ];
+
+        final mediumDecision = Bot(
+          difficulty: BotDifficulty.medium,
+        ).decide(game);
+        expect(mediumDecision.isPlay, isTrue);
+        expect(
+          game.board.scorePlacement(mediumDecision.placements!),
+          5,
+          reason: 'Medium wählt den punktereichsten (aber riskanten) Zug.',
+        );
+
+        final hardDecision = Bot(difficulty: BotDifficulty.hard).decide(game);
+        expect(hardDecision.isPlay, isTrue);
+        expect(
+          game.board.scorePlacement(hardDecision.placements!),
+          2,
+          reason:
+              'Hard meidet die riskante 5er-Reihe zugunsten der sichereren, '
+              'niedriger bewerteten Alternative.',
+        );
+      },
+    );
+
     test('hard: liefert einen gültigen, punktenden Zug', () {
       final anna = Player(id: 'a', name: 'Anna');
       final ben = Player(id: 'b', name: 'Ben');
