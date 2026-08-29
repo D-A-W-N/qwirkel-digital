@@ -6,6 +6,7 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../common/human_readable_error.dart';
+import '../history/match_history.dart';
 import 'lobby_widgets.dart';
 import 'network_connection_config.dart';
 import 'network_game_view.dart';
@@ -335,6 +336,7 @@ class _NetworkGameScreenState extends State<NetworkGameScreen> {
       return NetworkGameView(
         snapshot: _snapshot!,
         ownHand: _ownHand,
+        mode: MatchMode.lan,
         // `!isOver` ist nötig: `currentPlayerIndex` wechselt NICHT mehr,
         // sobald genau dieser Zug die Partie beendet (siehe
         // `QwirkleGame._advanceTurn`) - ohne die Zusatzbedingung bliebe die

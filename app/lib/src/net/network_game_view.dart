@@ -6,6 +6,7 @@ import 'package:qwirkle_core/qwirkle_core.dart';
 import 'package:qwirkle_net/qwirkle_net.dart';
 
 import '../game/widgets/board_surface.dart';
+import '../history/match_history.dart';
 import '../game/widgets/compact_button_style.dart';
 import '../game/widgets/game_bottom_bar.dart';
 import '../game/widgets/hand_view.dart';
@@ -56,6 +57,15 @@ class NetworkGameView extends StatefulWidget {
   /// freizugeben. `null` (LAN-Modus) zeigt keinen solchen Button.
   final VoidCallback? onLeaveRoom;
 
+  /// Ob dies eine LAN- oder eine Internet-Partie ist - nur für die
+  /// Partie-Historie (siehe [didUpdateWidget]) relevant, sonst ohne
+  /// Auswirkung auf dieses Widget.
+  final MatchMode mode;
+
+  /// Nur für Internet-Partien gesetzt (LAN kennt keine Raum-Codes) - fließt
+  /// ausschließlich in den [MatchRecord] der Partie-Historie ein.
+  final String? roomCode;
+
   const NetworkGameView({
     super.key,
     required this.snapshot,
@@ -66,6 +76,8 @@ class NetworkGameView extends StatefulWidget {
     required this.onSendExchange,
     required this.isRoomOwner,
     required this.onRestartGame,
+    required this.mode,
+    this.roomCode,
     this.statusText,
     this.errorText,
     this.onLeaveRoom,
@@ -185,6 +197,24 @@ class _NetworkGameViewState extends State<NetworkGameView> {
     // ALTEN Hand) auf die KOMPLETT NEUE Hand angewendet und blendete dort
     // einen falschen, unzusammenhängenden Stein aus/wieder ein.
     final restarted = oldWidget.snapshot.isOver && !widget.snapshot.isOver;
+    final justFinished = !oldWidget.snapshot.isOver && widget.snapshot.isOver;
+    if (justFinished) {
+      unawaited(
+        recordMatch(
+          MatchRecord(
+            playedAt: DateTime.now(),
+            mode: widget.mode,
+            roomCode: widget.roomCode,
+            standings: [
+              for (final player in [
+                ...widget.snapshot.players,
+              ]..sort((a, b) => b.score.compareTo(a.score)))
+                MatchPlayerResult(name: player.name, score: player.score),
+            ],
+          ),
+        ),
+      );
+    }
     if (turnAdvancedAwayFromMe || restarted) {
       if (_pendingPlacements.isNotEmpty) {
         _pendingPlacements.clear();

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../common/human_readable_error.dart';
+import '../history/match_history.dart';
 import 'internet_room_history.dart';
 import 'lobby_widgets.dart';
 import 'network_connection_config.dart';
@@ -188,6 +189,8 @@ class _InternetRoomScreenState extends ConsumerState<InternetRoomScreen> {
       return NetworkGameView(
         snapshot: snapshot,
         ownHand: snapshot.players[snapshot.yourPlayerIndex].hand ?? const [],
+        mode: MatchMode.internet,
+        roomCode: roomCode,
         canInteract:
             snapshot.currentPlayerIndex == snapshot.yourPlayerIndex &&
             !snapshot.isOver &&
